@@ -59,7 +59,7 @@ class PointList(DataObject):
 
         # attach a single descriptor to pointlist
         if 'tags' in kwargs.keys():
-            self.tags = kwargs['tags']
+            self.tags = kwargs['tags'].copy()
         else:
             self.tags = None
 

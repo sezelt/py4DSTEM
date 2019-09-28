@@ -4,32 +4,34 @@ from tqdm import tqdm
 
 from ..process.rdf import single_atom_scatter
 from ..process.utils import electron_wavelength_angstrom
+from ..file.datastructure import PointList, PointListArray
 
 from pdb import set_trace
 
 # a dictionary for converting element names into Z
 els = ('H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si',\
-       'P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni',\
-       'Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb',\
-       'Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',\
-       'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho',\
-       'Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',\
-       'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am',\
-       'Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt',\
-       'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og','Uue','Ubn','Ubn')
+	   'P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni',\
+	   'Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb',\
+	   'Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',\
+	   'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho',\
+	   'Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',\
+	   'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am',\
+	   'Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt',\
+	   'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og','Uue','Ubn','Ubn')
 
 elements = {els[i]: i+1 for i in range(len(els)) }
 
 class Kinematic:
 	"""
-	Kinematic performs kinematic diffraction simulations, to construct a library of simulated PointLists
-	with associated orientations, used for classifying.
+	Kinematic performs kinematic (single scattering) diffraction simulations 
+	to construct a library of simulated PointLists with associated orientations, used for classifying.
 	"""
 
 	def __init__(self, structure, max_index=6, poles=None, voltage=300_000, tol_zone=0.1, tol_int=10,
-		thickness=500):
+		thickness=500, **kwargs):
 		'''
 		Create a Kinematic simulation object. 
+
 		Accepts:
 		structure		a pymatgen Structure object for the material
 						or a string containing the Materials Project ID for the 
@@ -47,7 +49,7 @@ class Kinematic:
 						do not exactly satisfy Weiss zone law	
 
 		tol_int			cutoff for excluding very weak structure factors
-		
+
 		thickness		sample thickness in Å
 		'''
 
@@ -72,19 +74,102 @@ class Kinematic:
 		self.tol_int = tol_int
 
 		self.a = self.structure.lattice.abc[0]
-		self.N = thicness//self.a
+		self.N = thickness//self.a
 
 		self.λ = electron_wavelength_angstrom(voltage)
 
+		# rotation matrix to get a nonparallel vector for later calculations
+		# rotates by 5° about each axis
+		c = np.cos(5/180*np.pi)
+		s = np.sin(5/180*np.pi)
+		self.R = np.array([[1,0,0],[0,c,-s],[0,s,c]]) @ \
+			np.array([[c,0,s],[0,1,0],[-s,0,c]]) @ \
+			np.array([[c,-s,0],[s,c,0],[0,0,1]])
+
 		# ------- run computations --------
-		self.compute_structure_factors()
+		self._compute_structure_factors()
+
+		# if no poles are given, use the cubic structure's symmetric wedge:
+		if poles is None:
+			if 'n_poles' in kwargs.keys():
+				n = kwargs['n_poles']
+			else:
+				n = 250 # ROUGHLY this many poles
+			self.poles =self._cubic_poles(n)
+		else:
+			self.poles = poles
+
+		self._run_simulation()
 
 
-	def compute_structure_factors(self):
-		# generate diffraction patterns and convert to PointListArray
+	def explore_library(self):
+		from ipywidgets import interactive
+		from IPython.display import display
+		import matplotlib.pyplot as plt
 
-		hh, kk, ll = np.mgrid[-self.max_index:self.max_index,\
-			-self.max_index:self.max_index,-self.max_index:self.max_index]
+		def f(x):
+		    pl = self.pattern_library.get_pointlist(x,0)
+		    plt.figure(2,figsize=(6,6))
+		    plt.scatter(pl.data['qx'],pl.data['qy'],s=150*np.sqrt(pl.data['intensity']))
+		    plt.axis('equal')
+		    plt.title(f"g = [{pl.tags['pole'][0]:.0f},{pl.tags['pole'][1]:.0f},{pl.tags['pole'][2]:.0f}]")
+		    for i in range(pl.length):
+		        plt.text(pl.data['qx'][i]+0.008,pl.data['qy'][i],f"({pl.data['h'][i]:.0f},{pl.data['k'][i]:.0f},{pl.data['l'][i]:.0f})")
+		        
+		interactive_plot = interactive(f,x=(0,self.pattern_library.shape[0]-1))
+		interactive_plot.children[-1].layout.height = '400px'
+		display(interactive_plot)
+
+# ---------- PRIVATE METHODS ---------------- #
+
+	def _run_simulation(self):
+		# allocate pointlistarray:
+		tags = {'hkl':None, 'pole':None}
+		coordinates = ('qx','qy','h','k','l','intensity')
+		pla = PointListArray(coordinates=coordinates,
+			shape=(self.poles.shape[0],1),tags=tags)
+
+		# loop over all the poles
+		for i in tqdm(range(self.poles.shape[0]),desc='Generating diffraction patterns'):
+			pl = pla.get_pointlist(i,0)
+
+			uvw = self.poles[i,:]
+
+			# get the diffraction intensities for each reflection
+			pattern = self._generate_pattern(uvw)
+
+			# project reflections onto the plane defined by uvw
+			proj_points = pattern[:,0:3] - ( (pattern[:,0:3] @ uvw) /np.sum(uvw**2))[:,np.newaxis]
+
+			# generate two basis vectors in the plane:
+			# first, arbitrarily rotate the pole to get a non-parallel vector, then take 
+			# cross product with the pole
+			x = np.cross(uvw, uvw @ self.R)
+			# then cross this with the pole to get another ortho basis vector
+			y = np.cross(uvw,x)
+			# set to unit length
+			x /= np.linalg.norm(x)
+			y /= np.linalg.norm(y)
+
+			# find the projections along these bases to get the diffraction spots
+			qx = proj_points @ x
+			qy = proj_points @ y
+
+			data = np.vstack((qx,qy,pattern.T)).T
+
+			pl.add_unstructured_dataarray(data)
+			pl.tags['hkl'] = uvw
+			pl.tags['pole'] = mg.core.lattice.get_integer_index(uvw,verbose=False)
+
+		self.pattern_library = pla
+
+
+
+	def _compute_structure_factors(self):
+		# compute Fhkl for all reflections
+
+		hh, kk, ll = np.mgrid[-self.max_index:self.max_index+1,\
+			-self.max_index:self.max_index+1,-self.max_index:self.max_index+1]
 
 		hklI = np.vstack((hh.ravel(),kk.ravel(),ll.ravel(),np.zeros((len(hh.ravel()),)))).T
 
@@ -110,9 +195,10 @@ class Kinematic:
 
 		self.hklI = hklI
 
-		#return self.hklI
 
 	def _generate_pattern(self,uvw):
+		# apply zone law to find reciprocal lattice points that may be excited
+		# and scale structure factor by shape factor using excitation error
 		pattern = np.zeros((1,4))
 
 		hklI = self.hklI
@@ -123,19 +209,19 @@ class Kinematic:
 		k0 = uvw_0 / self.λ 
 		
 		for i in range(hklI.shape[0]):
-		    P = uvw_0 @ hklI[i,:3]
-		    if (np.abs(P) < self.tol_zone) and (hklI[i,3]>self.tol_int):
-		        #set_trace()
-		        refl = hklI[i,:].copy()
+			P = uvw_0 @ hklI[i,:3]
+			if (np.abs(P) < self.tol_zone) and (hklI[i,3]>self.tol_int):
+				#set_trace()
+				refl = hklI[i,:].copy()
 
-		        # this is not quite the right excitation error, need line distance formula
-		        g = k0 + (refl[:3] * self.recip_lat)
-		        exc = (1/self.λ) - np.linalg.norm(g)
+				# this is not quite the right excitation error, need line distance formula
+				g = k0 + (refl[:3] * self.recip_lat)
+				exc = (1/self.λ) - np.linalg.norm(g)
 
-		        refl[3] *= self._shape_factor(exc,self.a,self.N)
-		        if not np.isnan(refl[3]):
-		        	pattern = np.vstack((pattern,refl))
-		        
+				refl[3] *= self._shape_factor(exc,self.a,self.N)
+				if not np.isnan(refl[3]):
+					pattern = np.vstack((pattern,refl))
+				
 		maxInt = np.nanmax(pattern[:,3])
 		pattern[0,3] = maxInt
 		pattern[:,3] /= maxInt
@@ -143,10 +229,36 @@ class Kinematic:
 		return pattern
 
 	def _shape_factor(self,s,a,N):
-	    """
-	    find SS*(s) for excitation error s, unit cell size a, number atoms N
-	    """
-	    return np.sin(np.pi*s*a*N)**2 / np.sin(np.pi*s*a)**2
+		"""
+		find SS*(s) for excitation error s, unit cell size a, number atoms N
+		"""
+		return np.sin(np.pi*s*a*N)**2 / np.sin(np.pi*s*a)**2
+
+	def _cubic_poles(self,n):
+		print('Using cubic symmetric poles...', flush=True)
+		# generate n diffraction vectors spaced (uniformly?) within the symmetrically unique 
+		# subset of cubic diffraction vectors
+		a = np.array([1,0,0])
+		b = np.array([1,1,0])
+		c = np.array([1,1,1])
+
+		a0 = a / np.linalg.norm(a)
+		b0 = b / np.linalg.norm(b)
+		c0 = c / np.linalg.norm(c)
+
+		# matrix of unit vectors along symmetric poles
+		abc = np.vstack((a0,b0,c0))
+
+		n = np.ceil(np.cbrt(n))
+
+		i,j,k = np.mgrid[0:n,0:n,0:n]
+		ijk = np.vstack((i.ravel(),j.ravel(),k.ravel())).T
+		ijk = ijk[~np.all(ijk == 0, axis=1)]
+		ijk0 = ijk / np.linalg.norm(ijk,axis=1)[:,np.newaxis]
+		ijk0 = np.unique(ijk0,axis=0)
+
+		return ijk0 @ abc
+
 
 
 
