@@ -21,7 +21,7 @@ els = ('H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si',\
 
 elements = {els[i]: i+1 for i in range(len(els)) }
 
-class Kinematic:
+class KinematicLibrary:
 	"""
 	Kinematic performs kinematic (single scattering) diffraction simulations 
 	to construct a library of simulated PointLists with associated orientations, used for classifying.
