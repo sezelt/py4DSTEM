@@ -6,20 +6,6 @@ from ..process.rdf import single_atom_scatter
 from ..process.utils import electron_wavelength_angstrom
 from ..file.datastructure import PointList, PointListArray
 
-from pdb import set_trace
-
-# a dictionary for converting element names into Z
-els = ('H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si',\
-	   'P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni',\
-	   'Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb',\
-	   'Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',\
-	   'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho',\
-	   'Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',\
-	   'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am',\
-	   'Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt',\
-	   'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og','Uue','Ubn','Ubn')
-
-elements = {els[i]: i+1 for i in range(len(els)) }
 
 class KinematicLibrary:
 	"""
@@ -79,9 +65,9 @@ class KinematicLibrary:
 		self.λ = electron_wavelength_angstrom(voltage)
 
 		# rotation matrix to get a nonparallel vector for later calculations
-		# rotates by 5° about each axis
-		c = np.cos(5/180*np.pi)
-		s = np.sin(5/180*np.pi)
+		# rotates by a small amount about each axis
+		c = np.cos(0.1/180*np.pi)
+		s = np.sin(0.1/180*np.pi)
 		self.R = np.array([[1,0,0],[0,c,-s],[0,s,c]]) @ \
 			np.array([[c,0,s],[0,1,0],[-s,0,c]]) @ \
 			np.array([[c,-s,0],[s,c,0],[0,0,1]])
@@ -261,4 +247,15 @@ class KinematicLibrary:
 
 
 
+# a dictionary for converting element names into Z
+els = ('H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si',\
+	   'P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni',\
+	   'Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb',\
+	   'Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',\
+	   'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho',\
+	   'Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',\
+	   'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am',\
+	   'Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt',\
+	   'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og','Uue','Ubn','Ubn')
 
+elements = {els[i]: i+1 for i in range(len(els)) }
