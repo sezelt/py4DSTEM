@@ -24,7 +24,7 @@ class KinematicLibrary:
 						structure (requires API key in config file, see:
 						https://pymatgen.org/usage.html#setting-the-pmg-mapi-key-in-the-config-file
 
-		max_index		maximum hkl indices to compute
+		max_index		maximum hkl indices to compute structure factors
 
 		poles			numpy array (n,3) containing [h,k,l] indices for the n
 						orientations required in the simulation.
