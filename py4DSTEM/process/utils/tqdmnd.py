@@ -15,7 +15,6 @@ from tqdm import tqdm
 from itertools import product
 
 from operator import mul
-from functools import reduce, partial
 
 from collections.abc import Iterator
 
