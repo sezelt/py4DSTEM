@@ -159,14 +159,17 @@ class KinematicLibrary:
 
 		hklI = np.vstack((hh.ravel(),kk.ravel(),ll.ravel(),np.zeros((len(hh.ravel()),)))).T
 
-		# remove (0,0,0)
-		hklI = hklI[~np.all(hklI == 0, axis=1)]
+		# make a separate datastructure to hold the complex structure factors
+		hklF = np.zeros((len(hh.ravel()),),dtype=[('hkl','3int'),('F','complex')])
+
+		# remove (0,0,0) **This is now handled down below
+		#hklI = hklI[~np.all(hklI == 0, axis=1)]
 
 		# loop over reciprocal lattice points
 		for i in tqdm(range(hklI.shape[0]),desc='computing structure factors'):
 			hkl = hklI[i,0:3].copy()
 
-			q = np.array([1/self.structure.lattice.d_hkl(hkl)])
+			q = 0.0 if np.all(hkl==0) else np.array([1/self.structure.lattice.d_hkl(hkl)])
 
 			Fhkl = np.zeros((1,),dtype=np.complex)
 
@@ -179,10 +182,14 @@ class KinematicLibrary:
 
 			hklI[i,3] = np.abs(Fhkl)**2
 
+			hklF['hkl'][i] = hkl
+			hklF['F'][i] = Fhkl
+
 		self.hklI = hklI
+		self.hklF = hklF
 
 
-	def _generate_pattern(self,uvw):
+	def _generate_pattern(self,uvw,a=None,N=None):
 		# apply zone law to find reciprocal lattice points that may be excited
 		# and scale structure factor by shape factor using excitation error
 		pattern = np.zeros((1,4))
@@ -214,11 +221,49 @@ class KinematicLibrary:
 
 		return pattern
 
+	def _generate_transmission(self,uvw,a,N):
+		# this is the same as _generate_pattern but returns the complex
+		# transmission function instead of the instensity
+		pattern = np.zeros((0,),dtype=self.hklF.dtype)
+
+		hklF = self.hklF
+
+		# find unit vector along the zone
+		uvw_0 = uvw / np.sqrt(np.sum(uvw**2))
+
+		k0 = uvw_0 / self.λ 
+		
+		for i in range(hklF.shape[0]):
+			P = uvw_0 @ hklF['hkl'][i]
+			if (np.abs(P) < self.tol_zone) and (np.abs(hklF['F'][i])**2>self.tol_int):
+				#set_trace()
+				refl = hklF[i].copy()
+
+				# this is not quite the right excitation error, need line distance formula
+				g = k0 + (refl['hkl'] * self.recip_lat)
+				exc = (1/self.λ) - np.linalg.norm(g)
+
+				# IS THIS RIGHT?
+				#refl['F'] = np.real(refl['F']) * self._shape_factor(exc,a,N) + 1j*np.imag(refl['F'])
+				refl['F'] *= self._shape_factor(exc,a,N)
+				if not np.isnan(refl['F']):
+					pattern = np.hstack((pattern,refl))
+			
+		return pattern
+
+	def _generate_dynamical_pattern(self,uvw):
+		# account for multiple scattering by computing S-matrix for a unit cell
+		# thick slab and applying it iteratively, along with a propagation operator
+		pass
+
 	def _shape_factor(self,s,a,N):
 		"""
 		find SS*(s) for excitation error s, unit cell size a, number atoms N
 		"""
-		return np.sin(np.pi*s*a*N)**2 / np.sin(np.pi*s*a)**2
+		if np.isclose(s,0,atol=1e-10):
+			return N**2
+		else:
+			return np.sin(np.pi*s*a*N)**2 / np.sin(np.pi*s*a)**2
 
 	def _cubic_poles(self,n):
 		print('Using cubic symmetric poles...', flush=True)
