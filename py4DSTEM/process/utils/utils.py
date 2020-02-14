@@ -1,45 +1,16 @@
 # Defines utility functions used by other functions in the /process/ directory.
-from numpy.fft import fftfreq, fftshift
+
 import numpy as np
+from numpy.fft import fftfreq, fftshift
 from scipy.ndimage.filters import gaussian_filter
 from scipy.spatial import Voronoi
 import math as ma
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-import matplotlib.font_manager as fm
 
 try:
     from IPython.display import clear_output
 except ImportError:
     def clear_output(wait=True):
         pass
-
-def plot(img, title='Image', savePath=None, cmap='inferno', show=True, vmax=None, figsize=(10, 10), scale=None):
-    fig, ax = plt.subplots(figsize=figsize)
-    im = ax.imshow(img, interpolation='nearest', cmap=plt.cm.get_cmap(cmap), vmax=vmax)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title(title)
-    fontprops = fm.FontProperties(size=18)
-    if scale is not None:
-        scalebar = AnchoredSizeBar(ax.transData,
-                                   scale[0], scale[1], 'lower right',
-                                   pad=0.1,
-                                   color='white',
-                                   frameon=False,
-                                   size_vertical=img.shape[0] / 40,
-                                   fontproperties=fontprops)
-
-        ax.add_artist(scalebar)
-    ax.grid(False)
-    if savePath is not None:
-        fig.savefig(savePath + '.png', dpi=600)
-        fig.savefig(savePath + '.eps', dpi=600)
-    if show:
-        plt.show()
 
 def electron_wavelength_angstrom(E_eV):
     m = 9.109383 * 10 ** -31
@@ -390,36 +361,6 @@ def add_to_2D_array_from_floats(ar, x, y, I):
     return ar
 
 
-def radial_integral(ar, x0, y0):
-    """
-    Computes the radial integral of array ar from center x0,y0.
-
-    Based on efficient radial profile code found at www.astrobetter.com/wiki/python_radial_profiles,
-    with credit to Jessica R. Lu, Adam Ginsburg, and Ian J. Crossfield.
-    """
-    y, x = np.meshgrid(np.arange(ar.shape[1]), np.arange(ar.shape[0]))
-    r = np.sqrt((x - x0) ** 2 + (y - y0) ** 2)
-
-    # Get sorted radii and ar values
-    ind = np.argsort(r.flat)
-    r_sorted = r.flat[ind]
-    vals_sorted = ar.flat[ind]
-
-    # Cast to int (i.e. set binsize = 1)
-    r_int = r_sorted.astype(int)
-
-    # Find all pixels within each radial bin
-    delta_r = r_int[1:] - r_int[:-1]
-    rind = np.where(delta_r)[0]  # Gives nonzero elements of delta_r, i.e. where radius changes
-    nr = rind[1:] - rind[:-1]  # Number of pixels represented in each bin
-
-    # Cumulative sum in each radius bin
-    cs_vals = np.cumsum(vals_sorted, dtype=float)
-    bin_sum = cs_vals[rind[1:]] - cs_vals[rind[:-1]]
-
-    return bin_sum / nr, bin_sum, nr, rind
-
-
 def print_progress_bar(iteration, total, prefix='', suffix='', decimals=1,
                        length=100, fill='*'):
     """
@@ -577,6 +518,17 @@ def get_voronoi_vertices(voronoi, nx, ny, dist=10):
         vertex_list.append(vertices)
 
     return vertex_list
+
+def ewpc_lambda(Q_Nx,Q_Ny):
+    '''
+    Returns a lambda for comuting the exit wave power cepstrum of a diffraction pattern
+    using a Hanning window. This can be passed as the filter_function in the Bragg disk
+    detection functions (with the probe an array of ones) to find the lattice vectors 
+    by the EWPC method (but be careful as the lengths are now in realspace units!)
+    See https://arxiv.org/abs/1911.00984
+    '''
+    h = np.hanning(Q_Nx)[:,np.newaxis] * np.hanning(Q_Ny)[np.newaxis,:]
+    return lambda x: np.abs(np.fft.fftshift(np.fft.fft2(h*np.log(np.maximum(x,0.01)))))**2
 
 # Deprecated make_Fourier_coords functions - these are identical to np.fft.fftfreq
 
