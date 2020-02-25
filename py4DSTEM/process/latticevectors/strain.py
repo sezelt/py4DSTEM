@@ -5,6 +5,7 @@ from numpy.linalg import lstsq
 
 from ...file.datastructure import RealSlice
 
+
 def get_reference_uv(mask, uv_map):
     """
     Gets a pair of reference lattice vectors from a region of real space specified by mask.
@@ -24,13 +25,14 @@ def get_reference_uv(mask, uv_map):
         vy          (float) y-coord of the second reference lattice vector
     """
     assert isinstance(uv_map, RealSlice)
-    assert np.all([name in uv_map.slices.keys() for name in ('ux','uy','vx','vy')])
+    assert np.all([name in uv_map.slices.keys() for name in ("ux", "uy", "vx", "vy")])
     assert mask.dtype == bool
-    ux = np.median(uv_map.slices['ux'][mask])
-    uy = np.median(uv_map.slices['uy'][mask])
-    vx = np.median(uv_map.slices['vx'][mask])
-    vy = np.median(uv_map.slices['vy'][mask])
-    return ux,uy,vx,vy
+    ux = np.median(uv_map.slices["ux"][mask])
+    uy = np.median(uv_map.slices["uy"][mask])
+    vx = np.median(uv_map.slices["vx"][mask])
+    vy = np.median(uv_map.slices["vy"][mask])
+    return ux, uy, vx, vy
+
 
 def get_strain_from_reference_uv(ux, uy, vx, vy, uv_map):
     """
@@ -60,32 +62,41 @@ def get_strain_from_reference_uv(ux, uy, vx, vy, uv_map):
                                     of their rotation with respect to real space may be necessary.
     """
     assert isinstance(uv_map, RealSlice)
-    assert np.all([name in uv_map.slices.keys() for name in ('ux','uy','vx','vy','mask')])
+    assert np.all(
+        [name in uv_map.slices.keys() for name in ("ux", "uy", "vx", "vy", "mask")]
+    )
 
     # Get RealSlice for output storage
-    R_Nx,R_Ny = uv_map.slices['ux'].shape
-    strain_map = RealSlice(data=np.zeros((R_Nx,R_Ny,5)),
-                           slicelabels=('e_xx','e_yy','e_xy','theta','mask'),
-                           name='strain_map')
+    R_Nx, R_Ny = uv_map.slices["ux"].shape
+    strain_map = RealSlice(
+        data=np.zeros((R_Nx, R_Ny, 5)),
+        slicelabels=("e_xx", "e_yy", "e_xy", "theta", "mask"),
+        name="strain_map",
+    )
 
     # Get reference lattice matrix
-    M = np.array([[ux,uy],[vx,vy]])
+    M = np.array([[ux, uy], [vx, vy]])
 
     for Rx in range(R_Nx):
         for Ry in range(R_Ny):
             # Get lattice vectors for DP at Rx,Ry
-            alpha = np.array([[uv_map.slices['ux'][Rx,Ry],uv_map.slices['uy'][Rx,Ry]],
-                              [uv_map.slices['vx'][Rx,Ry],uv_map.slices['vy'][Rx,Ry]]])
+            alpha = np.array(
+                [
+                    [uv_map.slices["ux"][Rx, Ry], uv_map.slices["uy"][Rx, Ry]],
+                    [uv_map.slices["vx"][Rx, Ry], uv_map.slices["vy"][Rx, Ry]],
+                ]
+            )
             # Get transformation matrix
             beta = lstsq(M, alpha, rcond=None)[0].T
 
             # Get the infinitesimal strain matrix
-            strain_map.slices['e_xx'][Rx,Ry] = 1 - beta[0,0]
-            strain_map.slices['e_yy'][Rx,Ry] = 1 - beta[1,1]
-            strain_map.slices['e_xy'][Rx,Ry] = -(beta[0,1]+beta[1,0])/2.
-            strain_map.slices['theta'][Rx,Ry] =  (beta[0,1]-beta[1,0])/2.
-            strain_map.slices['mask'][Rx,Ry] = uv_map.slices['mask'][Rx,Ry]
+            strain_map.slices["e_xx"][Rx, Ry] = 1 - beta[0, 0]
+            strain_map.slices["e_yy"][Rx, Ry] = 1 - beta[1, 1]
+            strain_map.slices["e_xy"][Rx, Ry] = -(beta[0, 1] + beta[1, 0]) / 2.0
+            strain_map.slices["theta"][Rx, Ry] = (beta[0, 1] - beta[1, 0]) / 2.0
+            strain_map.slices["mask"][Rx, Ry] = uv_map.slices["mask"][Rx, Ry]
     return strain_map
+
 
 def get_strain_from_reference_region(mask, uv_map):
     """
@@ -114,12 +125,15 @@ def get_strain_from_reference_region(mask, uv_map):
                                     of their rotation with respect to real space may be necessary.
     """
     assert isinstance(uv_map, RealSlice)
-    assert np.all([name in uv_map.slices.keys() for name in ('ux','uy','vx','vy','mask')])
+    assert np.all(
+        [name in uv_map.slices.keys() for name in ("ux", "uy", "vx", "vy", "mask")]
+    )
     assert mask.dtype == bool
 
-    ux,uy,vx,vy = get_reference_uv(mask, uv_map)
-    strain_map = get_strain_from_reference_uv(ux,uy,vx,vy,uv_map)
+    ux, uy, vx, vy = get_reference_uv(mask, uv_map)
+    strain_map = get_strain_from_reference_uv(ux, uy, vx, vy, uv_map)
     return strain_map
+
 
 def get_rotated_strain_map(unrotated_strain_map, ux, uy):
     """
@@ -143,26 +157,43 @@ def get_rotated_strain_map(unrotated_strain_map, ux, uy):
                                 the rotated_strain_map.slices['e_xx'] element oriented along (ux,uy)
     """
     assert isinstance(unrotated_strain_map, RealSlice)
-    assert np.all([key in ['e_xx','e_xy','e_yy','theta','mask'] for key in unrotated_strain_map.slices.keys()])
+    assert np.all(
+        [
+            key in ["e_xx", "e_xy", "e_yy", "theta", "mask"]
+            for key in unrotated_strain_map.slices.keys()
+        ]
+    )
 
-    theta = -np.arctan2(uy,ux)
+    theta = -np.arctan2(uy, ux)
     cost = np.cos(theta)
     sint = np.sin(theta)
-    cost2 = cost**2
-    sint2 = sint**2
+    cost2 = cost ** 2
+    sint2 = sint ** 2
 
-    Rx,Ry = unrotated_strain_map.slices['e_xx'].shape
-    rotated_strain_map = RealSlice(data=np.zeros((Rx,Ry,5)),
-                                   slicelabels=['e_xx','e_xy','e_yy','theta','mask'],
-                                   name=unrotated_strain_map.name+"_rotated".format(np.degrees(theta)))
+    Rx, Ry = unrotated_strain_map.slices["e_xx"].shape
+    rotated_strain_map = RealSlice(
+        data=np.zeros((Rx, Ry, 5)),
+        slicelabels=["e_xx", "e_xy", "e_yy", "theta", "mask"],
+        name=unrotated_strain_map.name + "_rotated".format(np.degrees(theta)),
+    )
 
-    rotated_strain_map.data[:,:,0] = cost2*unrotated_strain_map.slices['e_xx'] - 2*cost*sint*unrotated_strain_map.slices['e_xy'] + sint2*unrotated_strain_map.slices['e_yy']
-    rotated_strain_map.data[:,:,1] = cost*sint*(unrotated_strain_map.slices['e_xx']-unrotated_strain_map.slices['e_yy']) + (cost2-sint2)*unrotated_strain_map.slices['e_xy']
-    rotated_strain_map.data[:,:,2] = sint2*unrotated_strain_map.slices['e_xx'] + 2*cost*sint*unrotated_strain_map.slices['e_xy'] + cost2*unrotated_strain_map.slices['e_yy']
-    rotated_strain_map.data[:,:,3] = unrotated_strain_map.slices['theta']
+    rotated_strain_map.data[:, :, 0] = (
+        cost2 * unrotated_strain_map.slices["e_xx"]
+        - 2 * cost * sint * unrotated_strain_map.slices["e_xy"]
+        + sint2 * unrotated_strain_map.slices["e_yy"]
+    )
+    rotated_strain_map.data[:, :, 1] = (
+        cost
+        * sint
+        * (unrotated_strain_map.slices["e_xx"] - unrotated_strain_map.slices["e_yy"])
+        + (cost2 - sint2) * unrotated_strain_map.slices["e_xy"]
+    )
+    rotated_strain_map.data[:, :, 2] = (
+        sint2 * unrotated_strain_map.slices["e_xx"]
+        + 2 * cost * sint * unrotated_strain_map.slices["e_xy"]
+        + cost2 * unrotated_strain_map.slices["e_yy"]
+    )
+    rotated_strain_map.data[:, :, 3] = unrotated_strain_map.slices["theta"]
 
-    rotated_strain_map.data[:,:,4] = unrotated_strain_map.slices['mask']
+    rotated_strain_map.data[:, :, 4] = unrotated_strain_map.slices["mask"]
     return rotated_strain_map
-
-
-

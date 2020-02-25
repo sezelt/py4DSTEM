@@ -4,7 +4,8 @@ import numpy as np
 from scipy.optimize import leastsq
 from py4DSTEM.process.utils import get_CoM
 
-def get_dq(q,d):
+
+def get_dq(q, d):
     """
     Get dq, the size of the detector pixels in the diffraction plane, in inverse length units.
 
@@ -16,9 +17,10 @@ def get_dq(q,d):
     Returns:
         dq      (number) the detector pixel size
     """
-    return 1/(q*d)
+    return 1 / (q * d)
 
-def get_dq_from_indexed_peaks(qs,hkl,a):
+
+def get_dq_from_indexed_peaks(qs, hkl, a):
     """
     Get dq, the size of the detector pixels in the diffraction plane, in inverse length units,
     using a set of measured peak distances from the optic axis, their Miller indices, and the known
@@ -37,24 +39,25 @@ def get_dq_from_indexed_peaks(qs,hkl,a):
         hkl_fit (list/tuple of length-3 tuples) the Miller indices of the fit peaks
         mask    (array of bools) False wherever hkl[i]==(0,0,0)
     """
-    assert len(qs)==len(hkl), "qs and hkl must have same length"
+    assert len(qs) == len(hkl), "qs and hkl must have same length"
 
     # Get spacings
-    d_inv = np.array([np.sqrt(a**2+b**2+c**2) for (a,b,c) in hkl])
-    mask = d_inv!=0
+    d_inv = np.array([np.sqrt(a ** 2 + b ** 2 + c ** 2) for (a, b, c) in hkl])
+    mask = d_inv != 0
 
     # Get scaling factor
-    c0 = np.average(qs[mask]/d_inv[mask])
-    fiterr = lambda c: qs[mask] - c*d_inv[mask]
-    popt,_ = leastsq(fiterr,c0)
+    c0 = np.average(qs[mask] / d_inv[mask])
+    fiterr = lambda c: qs[mask] - c * d_inv[mask]
+    popt, _ = leastsq(fiterr, c0)
     c = popt[0]
 
     # Get pixel size
-    dq = 1/(c*a)
-    qs_fit = d_inv[mask]/a
-    hkl_fit = [hkl[i] for i in range(len(hkl)) if mask[i]==True]
+    dq = 1 / (c * a)
+    qs_fit = d_inv[mask] / a
+    hkl_fit = [hkl[i] for i in range(len(hkl)) if mask[i] == True]
 
     return dq, qs_fit, hkl_fit
+
 
 def get_probe_size(DP, thresh_lower=0.01, thresh_upper=0.99, N=100):
     """
@@ -84,27 +87,24 @@ def get_probe_size(DP, thresh_lower=0.01, thresh_upper=0.99, N=100):
         x0              (float) the x position of the central disk center
         y0              (float) the y position of the central disk center
     """
-    thresh_vals = np.linspace(thresh_lower,thresh_upper,N)
+    thresh_vals = np.linspace(thresh_lower, thresh_upper, N)
     r_vals = np.zeros(N)
 
     # Get r for each mask
     DPmax = np.max(DP)
     for i in range(len(thresh_vals)):
         thresh = thresh_vals[i]
-        mask = DP > DPmax*thresh
-        r_vals[i] = np.sqrt(np.sum(mask)/np.pi)
+        mask = DP > DPmax * thresh
+        r_vals[i] = np.sqrt(np.sum(mask) / np.pi)
 
     # Get derivative and determine trustworthy r-values
     dr_dtheta = np.gradient(r_vals)
-    mask = (dr_dtheta <= 0) * (dr_dtheta >= 2*np.median(dr_dtheta))
+    mask = (dr_dtheta <= 0) * (dr_dtheta >= 2 * np.median(dr_dtheta))
     r = np.mean(r_vals[mask])
 
     # Get origin
     thresh = np.mean(thresh_vals[mask])
-    mask = DP > DPmax*thresh
-    x0,y0 = get_CoM(DP*mask)
+    mask = DP > DPmax * thresh
+    x0, y0 = get_CoM(DP * mask)
 
-    return r,x0,y0
-
-
-
+    return r, x0, y0

@@ -4,7 +4,10 @@ import numpy as np
 from ..utils import get_shifted_ar
 from ...file.datastructure import DataCube, PointListArray
 
-def get_class_DP(datacube, class_image, thresh=0.01, xshifts=None, yshifts=None, darkref=None):
+
+def get_class_DP(
+    datacube, class_image, thresh=0.01, xshifts=None, yshifts=None, darkref=None
+):
     """
     Get the average diffraction pattern for the class described in real space by class_image.
 
@@ -22,31 +25,43 @@ def get_class_DP(datacube, class_image, thresh=0.01, xshifts=None, yshifts=None,
     Returns:
         class_DP        (2D array) the average diffraction pattern for the class
     """
-    assert isinstance(datacube,DataCube)
-    assert class_image.shape == (datacube.R_Nx,datacube.R_Ny)
+    assert isinstance(datacube, DataCube)
+    assert class_image.shape == (datacube.R_Nx, datacube.R_Ny)
     if xshifts is not None:
-        assert xshifts.shape == (datacube.R_Nx,datacube.R_Ny)
+        assert xshifts.shape == (datacube.R_Nx, datacube.R_Ny)
     if yshifts is not None:
-        assert yshifts.shape == (datacube.R_Nx,datacube.R_Ny)
+        assert yshifts.shape == (datacube.R_Nx, datacube.R_Ny)
     if darkref is not None:
-        assert darkref.shape == (datacube.Q_Nx,datacube.Q_Ny)
+        assert darkref.shape == (datacube.Q_Nx, datacube.Q_Ny)
 
-    class_DP = np.zeros((datacube.Q_Nx,datacube.Q_Ny))
+    class_DP = np.zeros((datacube.Q_Nx, datacube.Q_Ny))
     for Rx in range(datacube.R_Nx):
         for Ry in range(datacube.R_Ny):
-            if class_image[Rx,Ry] >= thresh:
-                curr_DP = class_image[Rx,Ry]*datacube.data[Rx,Ry,:,:]
+            if class_image[Rx, Ry] >= thresh:
+                curr_DP = class_image[Rx, Ry] * datacube.data[Rx, Ry, :, :]
                 if xshifts is not None and yshifts is not None:
-                    xshift = xshifts[Rx,Ry]
-                    yshift = yshifts[Rx,Ry]
-                    curr_DP = get_shifted_ar(curr_DP,-xshift,-yshift)
+                    xshift = xshifts[Rx, Ry]
+                    yshift = yshifts[Rx, Ry]
+                    curr_DP = get_shifted_ar(curr_DP, -xshift, -yshift)
                 class_DP += curr_DP
                 if darkref is not None:
-                    class_DP -= darkref*class_image[Rx,Ry]
-    class_DP /= np.sum(class_image[class_image>=thresh])
+                    class_DP -= darkref * class_image[Rx, Ry]
+    class_DP /= np.sum(class_image[class_image >= thresh])
     return class_DP
 
-def get_class_DP_without_Bragg_scattering(datacube, class_image, braggpeaks, radius, x0, y0, thresh=0.01, xshifts=None, yshifts=None, darkref=None):
+
+def get_class_DP_without_Bragg_scattering(
+    datacube,
+    class_image,
+    braggpeaks,
+    radius,
+    x0,
+    y0,
+    thresh=0.01,
+    xshifts=None,
+    yshifts=None,
+    darkref=None,
+):
     """
     Get the average diffraction pattern, removing any Bragg scattering, for the class described in
     real space by class_image.
@@ -78,39 +93,43 @@ def get_class_DP_without_Bragg_scattering(datacube, class_image, braggpeaks, rad
     Returns:
         class_DP        (2D array) the average diffraction pattern for the class
     """
-    assert isinstance(datacube,DataCube)
-    assert class_image.shape == (datacube.R_Nx,datacube.R_Ny)
+    assert isinstance(datacube, DataCube)
+    assert class_image.shape == (datacube.R_Nx, datacube.R_Ny)
     assert isinstance(braggpeaks, PointListArray)
     if xshifts is not None:
-        assert xshifts.shape == (datacube.R_Nx,datacube.R_Ny)
+        assert xshifts.shape == (datacube.R_Nx, datacube.R_Ny)
     if yshifts is not None:
-        assert yshifts.shape == (datacube.R_Nx,datacube.R_Ny)
+        assert yshifts.shape == (datacube.R_Nx, datacube.R_Ny)
     if darkref is not None:
-        assert darkref.shape == (datacube.Q_Nx,datacube.Q_Ny)
+        assert darkref.shape == (datacube.Q_Nx, datacube.Q_Ny)
 
-    class_DP = np.zeros((datacube.Q_Nx,datacube.Q_Ny))
-    yy,xx = np.meshgrid(np.arange(datacube.Q_Ny),np.arange(datacube.Q_Nx))
+    class_DP = np.zeros((datacube.Q_Nx, datacube.Q_Ny))
+    yy, xx = np.meshgrid(np.arange(datacube.Q_Ny), np.arange(datacube.Q_Nx))
     for Rx in range(datacube.R_Nx):
         for Ry in range(datacube.R_Ny):
-            if class_image[Rx,Ry] >= thresh:
-                braggpeaks_curr = braggpeaks.get_pointlist(Rx,Ry)
-                mask = np.ones((datacube.Q_Nx,datacube.Q_Ny))
+            if class_image[Rx, Ry] >= thresh:
+                braggpeaks_curr = braggpeaks.get_pointlist(Rx, Ry)
+                mask = np.ones((datacube.Q_Nx, datacube.Q_Ny))
                 if braggpeaks_curr.length != 1:
-                    center_index = np.argmin(np.hypot(braggpeaks_curr.data['qx']-x0,
-                                                      braggpeaks_curr.data['qy']-y0))
+                    center_index = np.argmin(
+                        np.hypot(
+                            braggpeaks_curr.data["qx"] - x0,
+                            braggpeaks_curr.data["qy"] - y0,
+                        )
+                    )
                     for i in range(braggpeaks_curr.length):
                         if i != center_index:
-                            mask *= ((xx-braggpeaks_curr.data['qx'][i])**2 + \
-                                     (yy-braggpeaks_curr.data['qy'][i])**2) >= radius**2
-                curr_DP = class_image[Rx,Ry]*datacube.data[Rx,Ry,:,:]*mask
+                            mask *= (
+                                (xx - braggpeaks_curr.data["qx"][i]) ** 2
+                                + (yy - braggpeaks_curr.data["qy"][i]) ** 2
+                            ) >= radius ** 2
+                curr_DP = class_image[Rx, Ry] * datacube.data[Rx, Ry, :, :] * mask
                 if xshifts is not None and yshifts is not None:
-                    xshift = xshifts[Rx,Ry]
-                    yshift = yshifts[Rx,Ry]
-                    curr_DP = get_shifted_ar(curr_DP,-xshift,-yshift)
+                    xshift = xshifts[Rx, Ry]
+                    yshift = yshifts[Rx, Ry]
+                    curr_DP = get_shifted_ar(curr_DP, -xshift, -yshift)
                 class_DP += curr_DP
                 if darkref is not None:
-                    class_DP -= darkref*class_image[Rx,Ry]
-    class_DP /= np.sum(class_image[class_image>=thresh])
+                    class_DP -= darkref * class_image[Rx, Ry]
+    class_DP /= np.sum(class_image[class_image >= thresh])
     return class_DP
-
-

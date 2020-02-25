@@ -14,7 +14,8 @@ from PyQt5 import QtCore, QtWidgets
 from ..file.io.filebrowser import FileBrowser
 import pyqtgraph as pg
 
-def datacube_selector_dialog(fpath,window):
+
+def datacube_selector_dialog(fpath, window):
     """
     Loads a FileBrowser from given fpath and presents the user with a dialog to
     choose one of the datacubes inside the file, if more than one exists.
@@ -26,13 +27,13 @@ def datacube_selector_dialog(fpath,window):
         dc = fb.get_datacubes()
     elif fb.N_datacubes > 1:
         # there is more than one object, so we need to present the user with a chooser
-        indices = (self.dataobject_lookup_arr=='DataCube' | 
-            self.dataobject_lookup_arr=='RawDataCube').nonzero()[0]
-
+        indices = (
+            self.dataobject_lookup_arr
+            == "DataCube" | self.dataobject_lookup_arr
+            == "RawDataCube"
+        ).nonzero()[0]
 
     return dc
-
-
 
 
 def sibling_path(fpath, fname):
@@ -42,28 +43,30 @@ def sibling_path(fpath, fname):
     """
     return join(dirname(fpath), fname)
 
+
 def pg_point_roi(view_box):
     """
     Point selection.  Based in pyqtgraph, and returns a pyqtgraph CircleROI object.
     This object has a sigRegionChanged.connect() signal method to connect to other functions.
     """
-    circ_roi = pg.CircleROI( (-0.5,-0.5), (2,2), movable=True, pen=(0,9))
-    h = circ_roi.addTranslateHandle((0.5,0.5))
-    h.pen = pg.mkPen('r')
+    circ_roi = pg.CircleROI((-0.5, -0.5), (2, 2), movable=True, pen=(0, 9))
+    h = circ_roi.addTranslateHandle((0.5, 0.5))
+    h.pen = pg.mkPen("r")
     h.update()
     view_box.addItem(circ_roi)
     circ_roi.removeHandle(0)
     return circ_roi
 
+
 ############### Logged Quantities ###############
 
-class LQCollection(object):
 
+class LQCollection(object):
     def __init__(self):
         self._logged_quantities = dict()
 
     def New(self, name, dtype=float, **kwargs):
-        if dtype == 'file':
+        if dtype == "file":
             lq = FileLQ(name=name, **kwargs)
         else:
             lq = LoggedQuantity(name=name, dtype=dtype, **kwargs)
@@ -79,10 +82,17 @@ class LoggedQuantity(QtCore.QObject):
 
     updated_value = QtCore.pyqtSignal(object)  # Emitted on val update
 
-    def __init__(self, name, dtype=float, initial=0,
-                 vmin=-1e12, vmax=+1e12,
-                 spinbox_decimals=2, spinbox_step=0.1,
-                 unit=None):
+    def __init__(
+        self,
+        name,
+        dtype=float,
+        initial=0,
+        vmin=-1e12,
+        vmax=+1e12,
+        spinbox_decimals=2,
+        spinbox_step=0.1,
+        unit=None,
+    ):
 
         QtCore.QObject.__init__(self)
 
@@ -91,7 +101,7 @@ class LoggedQuantity(QtCore.QObject):
         self.val = dtype(initial)
         self.vmin, self.vmax = vmin, vmax
         self.unit = unit
-        if self.dtype==int:
+        if self.dtype == int:
             self.spinbox_step = 1
             self.spinbox_decimals = 0
         else:
@@ -100,7 +110,6 @@ class LoggedQuantity(QtCore.QObject):
 
         self.old_val = None
         self.widget_list = []
-
 
     @QtCore.pyqtSlot(float)
     @QtCore.pyqtSlot(int)
@@ -136,7 +145,7 @@ class LoggedQuantity(QtCore.QObject):
             if self.vmax is not None:
                 widget.setMaximum(self.vmax)
             if self.unit is not None:
-                widget.setSuffix(" "+self.unit)
+                widget.setSuffix(" " + self.unit)
             widget.setDecimals(self.spinbox_decimals)
             widget.setSingleStep(self.spinbox_step)
             widget.setValue(self.val)
@@ -163,8 +172,10 @@ class LoggedQuantity(QtCore.QObject):
 
         elif type(widget) == QtWidgets.QLineEdit:
             self.updated_value.connect(widget.setText)
+
             def on_edit_finished():
                 self.update_value(widget.text())
+
             widget.editingFinished.connect(on_edit_finished)
 
         elif type(widget) == QtWidget.QLabel:
@@ -175,15 +186,22 @@ class LoggedQuantity(QtCore.QObject):
             if self.unit is None:
                 suffix = ""
             if self.dtype == int:
-                integer=True
-                minStep=1
-                step=1
+                integer = True
+                minStep = 1
+                step = 1
             else:
-                integer=False
-                minStep=0.1
-                step=0.1
-            widget.setOpts(suffix=suffix, siPrefix=True, dec=True, int=integer,
-                           step=step, minStep=minStep, bounds=[self.vmin, self.vmax])
+                integer = False
+                minStep = 0.1
+                step = 0.1
+            widget.setOpts(
+                suffix=suffix,
+                siPrefix=True,
+                dec=True,
+                int=integer,
+                step=step,
+                minStep=minStep,
+                bounds=[self.vmin, self.vmax],
+            )
             widget.setDecimals(self.spinbox_decimals)
             widget.setSingleStep(self.spinbox_step)
 
@@ -196,16 +214,16 @@ class LoggedQuantity(QtCore.QObject):
         self.send_display_updates()
         self.widget_list.append(widget)
 
-    def coerce_to_type(self,x):
+    def coerce_to_type(self, x):
         return self.dtype(x)
 
     ########## End of LoggedQuantity object ##########
 
-class FileLQ(LoggedQuantity):
 
+class FileLQ(LoggedQuantity):
     def __init__(self, name, default_dir=None, **kwargs):
-        kwargs.pop('dtype',None)
-        LoggedQuantity.__init__(self,name,dtype=str,**kwargs)
+        kwargs.pop("dtype", None)
+        LoggedQuantity.__init__(self, name, dtype=str, **kwargs)
         self.default_dir = default_dir
 
     def connect_to_browse_widgets(self, lineEdit, pushButton):
@@ -216,22 +234,12 @@ class FileLQ(LoggedQuantity):
         pushButton.clicked.connect(self.file_browser)
 
     def file_browser(self):
-        
+
         # Platform agnotistic method of getting home directory
         home = expanduser("~")
 
-        #Start open filename in home directory
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(None,directory=home)
+        # Start open filename in home directory
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(None, directory=home)
         print(repr(fname))
         if fname:
             self.update_value(fname)
-
-
-
-
-
-
-
-
-
-

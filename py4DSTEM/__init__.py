@@ -6,5 +6,5 @@ from . import simulate
 from .version import __version__
 
 from .file.log import Logger
-logger = Logger()
 
+logger = Logger()

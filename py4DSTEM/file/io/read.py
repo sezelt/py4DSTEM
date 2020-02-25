@@ -30,6 +30,7 @@ from ...process.utils import bin2D, tqdmnd
 
 ###################### BEGIN read FUNCTIONS ########################
 
+
 @log
 def read(filename, load=None):
     """
@@ -86,73 +87,92 @@ def read(filename, load=None):
             except:
                 print("Hyperspy read failed")
                 return "Hyperspy read failed"
-        elif load == 'dmmmap':
+        elif load == "dmmmap":
             print("Memory mapping a dm file...")
             output = read_dm_mmap(filename)
-        elif load == 'empad':
+        elif load == "empad":
             print("Reading an EMPAD file...")
             output = read_empad_file(filename)
-        elif load == 'relativity':
+        elif load == "relativity":
             import mrcfile
+
             print("Reading an IDES Relativity MRC file...")
-            output = mrcfile.mmap(filename,mode='r')
-        elif load == 'gatan_bin':
-            print('Reading Gatan binary files...')
+            output = mrcfile.mmap(filename, mode="r")
+        elif load == "gatan_bin":
+            print("Reading Gatan binary files...")
             output = read_gatan_binary(filename)
-        elif load == 'kitware_counted':
-            print('Reading a Kitware electron counted dataset.')
+        elif load == "kitware_counted":
+            print("Reading a Kitware electron counted dataset.")
             output = read_kitware_counted(filename)
-        elif load == 'kitware_counted_mmap':
-            print('Memory-mapping a Kitware electron counted dataset.')
+        elif load == "kitware_counted_mmap":
+            print("Memory-mapping a Kitware electron counted dataset.")
             output = read_kitware_counted_mmap(filename)
         else:
-            raise ValueError("Unknown value for parameter 'load' = {}. See the read docstring for more info.".format(load))
+            raise ValueError(
+                "Unknown value for parameter 'load' = {}. See the read docstring for more info.".format(
+                    load
+                )
+            )
 
     else:
         browser = FileBrowser(filename)
-        print("{} is a py4DSTEM file, v{}.{}. Reading...".format(filename, browser.version[0], browser.version[1]))
+        print(
+            "{} is a py4DSTEM file, v{}.{}. Reading...".format(
+                filename, browser.version[0], browser.version[1]
+            )
+        )
         if load is None:
             output = browser.get_dataobject(0, memory_map=False)
-        elif load == 'all':
-            output = browser.get_dataobjects('all')
+        elif load == "all":
+            output = browser.get_dataobjects("all")
         elif type(load) == str:
             output = browser.get_dataobject_by_name(name=load)
         elif type(load) == int:
             output = browser.get_dataobject(load)
         elif type(load) == list:
-            assert all([isinstance(item,int) for item in load]), "If load is a list, it must be a list of ints specifying DataObject indices in the files associated FileBrowser."
+            assert all(
+                [isinstance(item, int) for item in load]
+            ), "If load is a list, it must be a list of ints specifying DataObject indices in the files associated FileBrowser."
             output = browser.get_dataobjects(load)
         else:
-            raise ValueError("Unknown value for parameter 'load' = {}. See the read docstring for more info.".format(load))
+            raise ValueError(
+                "Unknown value for parameter 'load' = {}. See the read docstring for more info.".format(
+                    load
+                )
+            )
 
     return output
+
 
 def read_with_hyperspy(filename):
     """
     Read a non-py4DSTEM file using hyperspy.
     """
     # Get metadata
-    metadata = Metadata(init='hs',filepath=filename)
+    metadata = Metadata(init="hs", filepath=filename)
 
     # Get data
     hyperspy_file = hs.load(filename)
     data = hyperspy_file.data
 
     # Get datacube
-    datacube = DataCube(data = data)
+    datacube = DataCube(data=data)
 
     # Link metadata and data
     datacube.metadata = metadata
 
     # Set scan shape, if in metadata
     try:
-        R_Nx = int(metadata.get_metadata_item('scan_size_Nx'))
-        R_Ny = int(metadata.get_metadata_item('scan_size_Ny'))
+        R_Nx = int(metadata.get_metadata_item("scan_size_Nx"))
+        R_Ny = int(metadata.get_metadata_item("scan_size_Ny"))
         datacube.set_scan_shape(R_Nx, R_Ny)
     except ValueError:
-        print("Warning: scan shape not detected in metadata; please check / set manually.")
+        print(
+            "Warning: scan shape not detected in metadata; please check / set manually."
+        )
 
     return datacube
+
 
 def read_dm_mmap(filename):
     """
@@ -161,40 +181,45 @@ def read_dm_mmap(filename):
 
     Read the metadata with hyperspy.
     """
-    assert (filename.endswith('.dm3') or filename.endswith('.dm4')), 'File must be a .dm3 or .dm4'
+    assert filename.endswith(".dm3") or filename.endswith(
+        ".dm4"
+    ), "File must be a .dm3 or .dm4"
 
     # Get metadata
     try:
-        metadata = Metadata(init='hs',filepath=filename)
+        metadata = Metadata(init="hs", filepath=filename)
     except:
         metadata = None
 
     # Load .dm3/.dm4 files with dm.py
-    with fileDM(filename,verbose=False) as dmfile:
+    with fileDM(filename, verbose=False) as dmfile:
         # loop through the datasets until a >2D one is found:
         i = 0
         valid_data = False
         while not valid_data:
             data = dmfile.getMemmap(i)
-            if len(np.squeeze(data).shape) > 2 :
+            if len(np.squeeze(data).shape) > 2:
                 valid_data = True
             i += 1
 
     # Get datacube
-    datacube = DataCube(data = data)
+    datacube = DataCube(data=data)
 
     # Link metadata and data
     datacube.metadata = metadata
 
     # Set scan shape, if in metadata
     try:
-        R_Nx = int(metadata.get_metadata_item('scan_size_Nx'))
-        R_Ny = int(metadata.get_metadata_item('scan_size_Ny'))
+        R_Nx = int(metadata.get_metadata_item("scan_size_Nx"))
+        R_Ny = int(metadata.get_metadata_item("scan_size_Ny"))
         datacube.set_scan_shape(R_Nx, R_Ny)
     except (ValueError, AttributeError):
-        print("Warning: scan shape not detected in metadata; please check / set manually.")
+        print(
+            "Warning: scan shape not detected in metadata; please check / set manually."
+        )
 
     return datacube
+
 
 def read_empad_file(filename):
     """
@@ -204,17 +229,18 @@ def read_empad_file(filename):
     """
     # Get data
     data = read_empad(filename)
-    data = data[:,:,:128,:]
+    data = data[:, :, :128, :]
 
     # Get metadata
     metadata = None
-    #metadata = Metadata(init='empad',filepath=filename)  # TODO: add setup_metadata_empad method
-                                                          # to Metadata object
+    # metadata = Metadata(init='empad',filepath=filename)  # TODO: add setup_metadata_empad method
+    # to Metadata object
 
-    datacube = DataCube(data = data)
+    datacube = DataCube(data=data)
     # datacube.metadata = metadata
 
     return datacube
+
 
 def read_gatan_binary(filename):
     """
@@ -229,15 +255,15 @@ def read_gatan_binary(filename):
     Requires ncempy: `pip install ncempy` and numba: `conda install numba`
     """
 
-    #this import is delayed to here so that numba is not a base dependency
+    # this import is delayed to here so that numba is not a base dependency
     from . import gatanK2
 
     data_map = gatanK2.K2DataArray(filename)
-    datacube = DataCube(data = data_map)
+    datacube = DataCube(data=data_map)
 
-    #metadata = Metadata(init='hs',filepath=datacube.data4D._gtg_file)
+    # metadata = Metadata(init='hs',filepath=datacube.data4D._gtg_file)
 
-    #datacube.metadata = metadata
+    # datacube.metadata = metadata
 
     return datacube
 
@@ -248,23 +274,26 @@ def read_kitware_counted(filename):
     (Not for py4DSTEM formatted files, which may be suported by 
     Kitware in the future.)
     """
-    hfile = h5py.File(filename,'r')
+    hfile = h5py.File(filename, "r")
 
-    R_Nx = hfile['electron_events']['scan_positions'].attrs['Ny']
-    R_Ny = hfile['electron_events']['scan_positions'].attrs['Nx']
+    R_Nx = hfile["electron_events"]["scan_positions"].attrs["Ny"]
+    R_Ny = hfile["electron_events"]["scan_positions"].attrs["Nx"]
 
-    Q_Nx = hfile['electron_events']['frames'].attrs['Ny']
-    Q_Ny = hfile['electron_events']['frames'].attrs['Nx']
+    Q_Nx = hfile["electron_events"]["frames"].attrs["Ny"]
+    Q_Ny = hfile["electron_events"]["frames"].attrs["Nx"]
 
-    pla = PointListArray([('ind','u4')],(R_Nx,R_Ny))
+    pla = PointListArray([("ind", "u4")], (R_Nx, R_Ny))
 
-    print('Importing Electron Events:',flush=True)
+    print("Importing Electron Events:", flush=True)
 
-    for (i,j) in tqdmnd(int(R_Nx),int(R_Ny)):
-        ind = np.ravel_multi_index((i,j),(R_Nx,R_Ny))
-        pla.get_pointlist(i,j).add_dataarray(hfile['electron_events']['frames'][ind].astype([('ind','u4')]))
+    for (i, j) in tqdmnd(int(R_Nx), int(R_Ny)):
+        ind = np.ravel_multi_index((i, j), (R_Nx, R_Ny))
+        pla.get_pointlist(i, j).add_dataarray(
+            hfile["electron_events"]["frames"][ind].astype([("ind", "u4")])
+        )
 
-    return CountedDataCube(pla,[Q_Nx,Q_Ny],'ind',use_dask=False)
+    return CountedDataCube(pla, [Q_Nx, Q_Ny], "ind", use_dask=False)
+
 
 def read_kitware_counted_mmap(filename):
     """
@@ -272,13 +301,19 @@ def read_kitware_counted_mmap(filename):
     (Not for py4DSTEM formatted files, which may be suported by 
     Kitware in the future.)
     """
-    hfile = h5py.File(filename,'r')
+    hfile = h5py.File(filename, "r")
 
-    R_Nx = hfile['electron_events']['scan_positions'].attrs['Ny']
-    R_Ny = hfile['electron_events']['scan_positions'].attrs['Nx']
+    R_Nx = hfile["electron_events"]["scan_positions"].attrs["Ny"]
+    R_Ny = hfile["electron_events"]["scan_positions"].attrs["Nx"]
 
-    Q_Nx = hfile['electron_events']['frames'].attrs['Nx']
-    Q_Ny = hfile['electron_events']['frames'].attrs['Ny']
+    Q_Nx = hfile["electron_events"]["frames"].attrs["Nx"]
+    Q_Ny = hfile["electron_events"]["frames"].attrs["Ny"]
 
-    return CountedDataCube(hfile['electron_events']['frames'],[Q_Nx,Q_Ny],[None],
-        use_dask=False,R_Nx=R_Nx,R_Ny=R_Ny)
+    return CountedDataCube(
+        hfile["electron_events"]["frames"],
+        [Q_Nx, Q_Ny],
+        [None],
+        use_dask=False,
+        R_Nx=R_Nx,
+        R_Ny=R_Ny,
+    )

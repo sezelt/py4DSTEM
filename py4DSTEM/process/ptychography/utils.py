@@ -4,9 +4,26 @@ import math as m
 import cmath as cm
 from numba import cuda
 
+
 @cuda.jit
-def single_sideband_kernel(G, strides, Qx_all, Qy_all, Kx_all, Ky_all, aberrations, aberration_angles, theta_rot, alpha,
-                           Ψ_Qp, Ψ_Qp_left_sb, Ψ_Qp_right_sb, eps, lam, scale):
+def single_sideband_kernel(
+    G,
+    strides,
+    Qx_all,
+    Qy_all,
+    Kx_all,
+    Ky_all,
+    aberrations,
+    aberration_angles,
+    theta_rot,
+    alpha,
+    Ψ_Qp,
+    Ψ_Qp_left_sb,
+    Ψ_Qp_right_sb,
+    eps,
+    lam,
+    scale,
+):
     """
 
     :param G: array_like , 4D G-function used in ptychography
@@ -27,6 +44,7 @@ def single_sideband_kernel(G, strides, Qx_all, Qy_all, Kx_all, Ky_all, aberratio
     :param scale: float, scale factor to scale the aperture to the measured intensity
     :return: nothing
     """
+
     def aperture2(qx, qy, lam, alpha_max, scale):
         qx2 = qx ** 2
         qy2 = qy ** 2
@@ -79,18 +97,44 @@ def single_sideband_kernel(G, strides, Qx_all, Qy_all, Kx_all, Ky_all, aberratio
         kphi = m.atan2(qy, qx)
         # print(a0.shape, scales.shape)
         cos = m.cos
-        chi = 2.0 * np.pi / lam * (1.0 * (a[1] * cos(2 * (kphi - phi[0])) + a[0]) * ktheta +
-                                   1.0 / 2 * (a[3] * cos(2 * (kphi - phi[1])) + a[2]) * ktheta ** 2 +
-                                   1.0 / 3 * (a[5] * cos(3 * (kphi - phi[2])) + a[4] * cos(
-                    1 * (kphi - phi[3]))) * ktheta ** 3 +
-                                   1.0 / 4 * (a[8] * cos(4 * (kphi - phi[4])) + a[7] * cos(2 * (kphi - phi[5])) + a[
-                    6]) * ktheta ** 4 +
-                                   1.0 / 5 * (a[11] * cos(5 * (kphi - phi[6])) + a[10] * cos(3 * (kphi - phi[7])) + a[
-                    9] * cos(
-                    1 * (kphi - phi[8]))) * ktheta ** 5 +
-                                   1.0 / 6 * (a[15] * cos(6 * (kphi - phi[9])) + a[14] * cos(4 * (kphi - phi[10])) + a[
-                    13] * cos(
-                    2 * (kphi - phi[11])) + a[12]) * ktheta ** 6)
+        chi = (
+            2.0
+            * np.pi
+            / lam
+            * (
+                1.0 * (a[1] * cos(2 * (kphi - phi[0])) + a[0]) * ktheta
+                + 1.0 / 2 * (a[3] * cos(2 * (kphi - phi[1])) + a[2]) * ktheta ** 2
+                + 1.0
+                / 3
+                * (a[5] * cos(3 * (kphi - phi[2])) + a[4] * cos(1 * (kphi - phi[3])))
+                * ktheta ** 3
+                + 1.0
+                / 4
+                * (
+                    a[8] * cos(4 * (kphi - phi[4]))
+                    + a[7] * cos(2 * (kphi - phi[5]))
+                    + a[6]
+                )
+                * ktheta ** 4
+                + 1.0
+                / 5
+                * (
+                    a[11] * cos(5 * (kphi - phi[6]))
+                    + a[10] * cos(3 * (kphi - phi[7]))
+                    + a[9] * cos(1 * (kphi - phi[8]))
+                )
+                * ktheta ** 5
+                + 1.0
+                / 6
+                * (
+                    a[15] * cos(6 * (kphi - phi[9]))
+                    + a[14] * cos(4 * (kphi - phi[10]))
+                    + a[13] * cos(2 * (kphi - phi[11]))
+                    + a[12]
+                )
+                * ktheta ** 6
+            )
+        )
 
         return chi
 
@@ -115,13 +159,15 @@ def single_sideband_kernel(G, strides, Qx_all, Qy_all, Kx_all, Ky_all, aberratio
         Qx = Qx_rot
         Qy = Qy_rot
 
-        A = aperture2(Ky, Kx, lam, alpha, scale) * cm.exp(1j * chi3(Ky, Kx, lam, aberrations, aberration_angles))
-        A_KplusQ = aperture2(Ky + Qy, Kx + Qx, lam, alpha, scale) * cm.exp(1j *
-                                                                           chi3(Ky + Qy, Ky + Qx, lam, aberrations,
-                                                                                aberration_angles))
-        A_KminusQ = aperture2(Ky - Qy, Kx - Qx, lam, alpha, scale) * cm.exp(1j *
-                                                                            chi3(Ky - Qy, Kx - Qx, lam, aberrations,
-                                                                                 aberration_angles))
+        A = aperture2(Ky, Kx, lam, alpha, scale) * cm.exp(
+            1j * chi3(Ky, Kx, lam, aberrations, aberration_angles)
+        )
+        A_KplusQ = aperture2(Ky + Qy, Kx + Qx, lam, alpha, scale) * cm.exp(
+            1j * chi3(Ky + Qy, Ky + Qx, lam, aberrations, aberration_angles)
+        )
+        A_KminusQ = aperture2(Ky - Qy, Kx - Qx, lam, alpha, scale) * cm.exp(
+            1j * chi3(Ky - Qy, Kx - Qx, lam, aberrations, aberration_angles)
+        )
 
         Γ = A.conjugate() * A_KminusQ - A * A_KplusQ.conjugate()
 

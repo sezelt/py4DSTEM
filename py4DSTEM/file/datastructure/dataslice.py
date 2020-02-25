@@ -8,8 +8,8 @@ import numpy as np
 from collections import OrderedDict
 from .dataobject import DataObject
 
-class DataSlice(DataObject):
 
+class DataSlice(DataObject):
     def __init__(self, data, Nx, Ny, slicelabels=None, **kwargs):
         """
         Instantiate a DataSlice object.  Set the data and dimensions.
@@ -32,21 +32,28 @@ class DataSlice(DataObject):
 
         self.data = data
         shape = data.shape
-        assert (len(shape)==2) or (len(shape)==3)
-        if len(shape)==2:
-            assert shape==(self.Nx,self.Ny), "Shape of data is {}, but (DataSlice.Nx, DataSlice.Ny) = ({}, {}).".format(shape, self.Nx, self.Ny)
-            self.depth=1
+        assert (len(shape) == 2) or (len(shape) == 3)
+        if len(shape) == 2:
+            assert shape == (
+                self.Nx,
+                self.Ny,
+            ), "Shape of data is {}, but (DataSlice.Nx, DataSlice.Ny) = ({}, {}).".format(
+                shape, self.Nx, self.Ny
+            )
+            self.depth = 1
         else:
-            assert shape[:2]==(self.Nx,self.Ny), "Shape of data is {}, but (DataSlice.Nx, DataSlice.Ny) = ({}, {}).".format(shape, self.Nx, self.Ny)
+            assert shape[:2] == (
+                self.Nx,
+                self.Ny,
+            ), "Shape of data is {}, but (DataSlice.Nx, DataSlice.Ny) = ({}, {}).".format(
+                shape, self.Nx, self.Ny
+            )
             self.depth = shape[2]
             if slicelabels is None:
                 self.slicelabels = np.arange(self.depth)
             else:
-                assert len(slicelabels)==self.depth
+                assert len(slicelabels) == self.depth
                 self.slicelabels = slicelabels
             self.slices = OrderedDict()
             for i in range(self.depth):
-                self.slices[self.slicelabels[i]]=self.data[:,:,i]
-
-
-
+                self.slices[self.slicelabels[i]] = self.data[:, :, i]

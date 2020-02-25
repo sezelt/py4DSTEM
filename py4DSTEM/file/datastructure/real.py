@@ -5,8 +5,8 @@ from collections import OrderedDict
 from .dataobject import DataObject
 from .dataslice import DataSlice
 
-class RealSlice(DataObject):
 
+class RealSlice(DataObject):
     def __init__(self, data, R_Nx=None, R_Ny=None, slicelabels=None, **kwargs):
         """
         Instantiate a RealSlice object.  Set the data and dimensions.
@@ -33,8 +33,11 @@ class RealSlice(DataObject):
             self.R_Ny = R_Ny
 
         # Instantiate as DataSlice, setting up dimensions, depth, and slicelabels
-        DataSlice.__init__(self, data=data,
-                           Nx=self.R_Nx, Ny=self.R_Ny,
-                           slicelabels=slicelabels, **kwargs)
-
-
+        DataSlice.__init__(
+            self,
+            data=data,
+            Nx=self.R_Nx,
+            Ny=self.R_Ny,
+            slicelabels=slicelabels,
+            **kwargs
+        )

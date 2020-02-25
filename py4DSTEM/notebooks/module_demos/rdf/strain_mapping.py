@@ -147,8 +147,8 @@ if analyze_data:
     coef_array[np.where(coef_array[:, :, 6] == 0)] = 10
 
     radius_ref = (
-        29
-    )  # used to set 0 strain value - remember that strain values are comparative!
+        29  # used to set 0 strain value - remember that strain values are comparative!
+    )
     # mask of regions that are crystalline
     # strains = amorph.calculate_coef_strain(coef_array, r_ref=radius_ref, A_ref=np.median(coef_array[:,:,9]), B_ref=np.median(coef_array[:,:,10]), C_ref=np.median(coef_array[:,:,11]))
     strains = amorph.calculate_coef_strain(coef_array, r_ref=radius_ref)

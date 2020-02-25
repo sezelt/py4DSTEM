@@ -3,6 +3,7 @@
 import numpy as np
 from scipy.optimize import curve_fit
 
+
 def fit_2D(function, data, data_mask=None, return_ar=True, popt_guess=None):
     """
     Performs a 2D fit, where the fit function takes its first input in the form of a length 2
@@ -28,16 +29,16 @@ def fit_2D(function, data, data_mask=None, return_ar=True, popt_guess=None):
                     same shape as data, containing the fit values
     """
     shape = data.shape
-    x,y = np.arange(shape[0]),np.arange(shape[1])
-    ry,rx = np.meshgrid(y,x)
-    rx_1D = rx.reshape((1,np.prod(shape)))
-    ry_1D = ry.reshape((1,np.prod(shape)))
+    x, y = np.arange(shape[0]), np.arange(shape[1])
+    ry, rx = np.meshgrid(y, x)
+    rx_1D = rx.reshape((1, np.prod(shape)))
+    ry_1D = ry.reshape((1, np.prod(shape)))
     xy = np.vstack((rx_1D, ry_1D))
 
     if data_mask is not None:
-        rx_1D_known = rx_1D[data_mask.reshape((1,np.prod(shape)))]
-        ry_1D_known = ry_1D[data_mask.reshape((1,np.prod(shape)))]
-        xy_known = np.vstack((rx_1D_known,ry_1D_known))
+        rx_1D_known = rx_1D[data_mask.reshape((1, np.prod(shape)))]
+        ry_1D_known = ry_1D[data_mask.reshape((1, np.prod(shape)))]
+        xy_known = np.vstack((rx_1D_known, ry_1D_known))
         data_1D = data[data_mask]
         if popt_guess is not None:
             popt, pcov = curve_fit(function, xy_known, data_1D, p0=popt_guess)
@@ -51,8 +52,7 @@ def fit_2D(function, data, data_mask=None, return_ar=True, popt_guess=None):
             popt, pcov = curve_fit(function, xy, data_1D)
 
     if return_ar:
-        fit_ar = function(xy,*popt).reshape(shape)
+        fit_ar = function(xy, *popt).reshape(shape)
         return popt, pcov, fit_ar
     else:
         return popt, pcov
-

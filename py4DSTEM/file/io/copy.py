@@ -2,7 +2,7 @@
 #
 # The new file may be a complete copy of the original, or it may contain any subset of the original
 # files DataObjects.
-# 
+#
 # See filestructure.txt for a description of the file structure.
 
 import h5py
@@ -16,7 +16,9 @@ from ..datastructure import PointList, PointListArray
 from ..datastructure import DataObject, Metadata
 
 from ..log import log, Logger
+
 logger = Logger()
+
 
 @log
 def copy_from_indices(original_filepath, new_filepath, indices):
@@ -34,16 +36,27 @@ def copy_from_indices(original_filepath, new_filepath, indices):
     if isinstance(indices, int):
         indices = [indices]
     elif isinstance(indices, list):
-        assert all([isinstance(item,int) for item in indices]), "Error: indices must be an int or a list of ints"
+        assert all(
+            [isinstance(item, int) for item in indices]
+        ), "Error: indices must be an int or a list of ints"
     else:
         raise Exception("indices must be either an int or a list of ints.")
 
     #### Open a FileBrowser ####
     print("Opening file {}...".format(original_filepath))
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
-    assert max(indices) <= browser.N_dataobjects, "DataObject at index {} was requested, but the original file contains only {} DataObjects.".format(max(indices), browser.N_dataobjects)
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
+    assert (
+        max(indices) <= browser.N_dataobjects
+    ), "DataObject at index {} was requested, but the original file contains only {} DataObjects.".format(
+        max(indices), browser.N_dataobjects
+    )
 
     #### Get data from existing .h5 file ####
     dataobjects = browser.get_dataobjects(indices)
@@ -54,15 +67,21 @@ def copy_from_indices(original_filepath, new_filepath, indices):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_datacubes(original_filepath, new_filepath):
     """
     Copies only the DataCubes from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = browser.get_datacubes()
@@ -73,15 +92,21 @@ def copy_datacubes(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_diffractionslices(original_filepath, new_filepath):
     """
     Copies only the DiffractionSlices from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = browser.get_diffractionslices()
@@ -92,15 +117,21 @@ def copy_diffractionslices(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_realslices(original_filepath, new_filepath):
     """
     Copies only the RealSlices from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = browser.get_realslices()
@@ -111,15 +142,21 @@ def copy_realslices(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_pointlists(original_filepath, new_filepath):
     """
     Copies only the PointLists from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = browser.get_pointlists()
@@ -130,15 +167,21 @@ def copy_pointlists(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_pointlistarrays(original_filepath, new_filepath):
     """
     Copies only the pointlistarrays from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = browser.get_pointlistarrays()
@@ -149,18 +192,24 @@ def copy_pointlistarrays(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_all(original_filepath, new_filepath):
     """
     Copies all DataObjects from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
-    dataobjects = browser.get_dataobjects('all')
+    dataobjects = browser.get_dataobjects("all")
 
     #### Write new file ####
     save(dataobjects, new_filepath, save_metadata=False)
@@ -168,15 +217,21 @@ def copy_all(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
 def copy_all_except_datacubes(original_filepath, new_filepath):
     """
     Copies all DataObjects from original filepath to new_filepath.
     """
     #### Open a FileBrowser ####
-    assert is_py4DSTEM_file(original_filepath), "filepath paramter must point to an existing py4DSTEM file."
+    assert is_py4DSTEM_file(
+        original_filepath
+    ), "filepath paramter must point to an existing py4DSTEM file."
     browser = FileBrowser(original_filepath)
-    assert browser.version == (0,3), "Copying py4DSTEM files only supported in v0.3 and higher." ##TODO: this forces v0.3, not >v0..3
+    assert browser.version == (
+        0,
+        3,
+    ), "Copying py4DSTEM files only supported in v0.3 and higher."  ##TODO: this forces v0.3, not >v0..3
 
     #### Get data ####
     dataobjects = []
@@ -191,8 +246,9 @@ def copy_all_except_datacubes(original_filepath, new_filepath):
     ##### Finish and close #####
     browser.close()
 
+
 @log
-def copy(original_filepath, new_filepath, save='all'):
+def copy(original_filepath, new_filepath, save="all"):
     """
     Copies DataObjects specified by indices from the py4DSTEM .h5 file at original_filepath to a
     new file at new_filepath.
@@ -214,35 +270,40 @@ def copy(original_filepath, new_filepath, save='all'):
         save                see above
     """
     if isinstance(save, str):
-        if save=='all':
+        if save == "all":
             copy_all(original_filepath, new_filepath)
-        elif save=='DataCube':
+        elif save == "DataCube":
             copy_datacubes(original_filepath, new_filepath)
-        elif save=='DiffractionSlice':
+        elif save == "DiffractionSlice":
             copy_diffractionslices(original_filepath, new_filepath)
-        elif save=='RealSlice':
+        elif save == "RealSlice":
             copy_realslices(original_filepath, new_filepath)
-        elif save=='PointList':
+        elif save == "PointList":
             copy_pointlists(original_filepath, new_filepath)
-        elif save=='PointListArrays':
+        elif save == "PointListArrays":
             copy_pointlistarrays(original_filepath, new_filepath)
-        elif save=='nocube':
+        elif save == "nocube":
             copy_all_except_datacubes(original_filepath, new_filepath)
         else:
-            raise Exception("If save is a str, it must be 'all', 'DataCube', 'DiffractionSlice', 'RealSlice', 'PointList', 'PointListArray', or 'nocube'. Recieved argument {}.".format(save))
+            raise Exception(
+                "If save is a str, it must be 'all', 'DataCube', 'DiffractionSlice', 'RealSlice', 'PointList', 'PointListArray', or 'nocube'. Recieved argument {}.".format(
+                    save
+                )
+            )
 
     elif isinstance(save, int):
         copy_from_indices(original_filepath, new_filepath, save)
 
     elif isinstance(save, list):
-        assert all([isinstance(item, int) for item in save]), "If save is a list, all elements must be ints."
+        assert all(
+            [isinstance(item, int) for item in save]
+        ), "If save is a list, all elements must be ints."
         copy_from_indices(original_filepath, new_filepath, save)
 
     else:
-        raise Exception("save must be an int, a list of ints, or a str. See copy docstring for more info.")
+        raise Exception(
+            "save must be an int, a list of ints, or a str. See copy docstring for more info."
+        )
 
 
 ################### END OF COPY FUNCTIONS #####################
-
-
-

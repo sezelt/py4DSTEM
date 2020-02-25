@@ -265,13 +265,13 @@ class polar_elliptical_transform(object):
         # and set up KDE kernels
         sr = r_sigma / self.dr
         vr = np.arange(-np.ceil(4 * sr), np.ceil(4 * sr) + 1, 1)
-        kr = np.exp(-vr ** 2 / (2 * sr ** 2))
+        kr = np.exp(-(vr ** 2) / (2 * sr ** 2))
         kr = np.expand_dims(kr, axis=0)
 
         dt = self.dtheta * 180 / np.pi
         st = t_sigma / dt
         vt = np.arange(-np.ceil(4 * st), np.ceil(4 * st) + 1, 1)
-        kt = np.exp(-vt ** 2 / (2 * st ** 2))
+        kt = np.exp(-(vt ** 2) / (2 * st ** 2))
         kt = np.expand_dims(kt, axis=1)
 
         # convolve by kr
@@ -629,16 +629,24 @@ def two_sided_gaussian_fun(X, coef):
         coef[9] = C
         coef[10] = R
     """
-    r = np.sqrt( (X[0] - coef[6])**2 + coef[8]*(X[0] - coef[6])*(X[1] - coef[7]) + \
-                                                        coef[9]*(X[1] - coef[7])**2 )
-    return coef[1] * np.exp( (-1/ (2*coef[2]**2)) * r**2) + \
-           coef[3] * np.exp( (-1/ (2*coef[4]**2)) * (coef[10] - r)**2) * \
-           np.heaviside((coef[10] - r),0) + \
-           coef[3] * np.exp( (-1/ (2*coef[5]**2)) * (coef[10] - r)**2) * \
-           np.heaviside((r - coef[10]),0) + \
-           coef[0]
+    r = np.sqrt(
+        (X[0] - coef[6]) ** 2
+        + coef[8] * (X[0] - coef[6]) * (X[1] - coef[7])
+        + coef[9] * (X[1] - coef[7]) ** 2
+    )
+    return (
+        coef[1] * np.exp((-1 / (2 * coef[2] ** 2)) * r ** 2)
+        + coef[3]
+        * np.exp((-1 / (2 * coef[4] ** 2)) * (coef[10] - r) ** 2)
+        * np.heaviside((coef[10] - r), 0)
+        + coef[3]
+        * np.exp((-1 / (2 * coef[5] ** 2)) * (coef[10] - r) ** 2)
+        * np.heaviside((r - coef[10]), 0)
+        + coef[0]
+    )
 
-def accumarray(indices,values,size):
+
+def accumarray(indices, values, size):
     """
     Helper function to mimic matlab accum array function.
 
@@ -654,5 +662,5 @@ def accumarray(indices,values,size):
     assert indices.shape[1] == len(size), "Size and array mismatch"
 
     output = np.zeros(size)
-    np.add.at(output,(indices[:,0],indices[:,1]),values)
+    np.add.at(output, (indices[:, 0], indices[:, 1]), values)
     return dest

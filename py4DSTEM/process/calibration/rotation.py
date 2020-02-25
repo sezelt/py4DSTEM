@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 class RQ_axes(object):
     """
     An object which specifies the relative orientation of real and reciprocal space, keeps track
@@ -20,6 +21,7 @@ class RQ_axes(object):
     in the method docstrings.  u and v define a right-handed coordinate system, such that
         np.cross(Qu,Qv) == np.corss(Ru,Rv) == +1
     """
+
     def __init__(self, RQ_offset, flip=False):
         """
         Initialize the RQ axes object.
@@ -59,20 +61,20 @@ class RQ_axes(object):
             Qux         (float) the x coodinate of u in diffraction space
             Quy         (float) the y coodinate of u in diffraction space
         """
-        length = np.hypot(Qux,Quy)
-        self.Qux = Qux/length
-        self.Quy = Quy/length
+        length = np.hypot(Qux, Quy)
+        self.Qux = Qux / length
+        self.Quy = Quy / length
         self.Qvx = -self.Quy
         self.Qvy = self.Qux
 
         theta = np.radians(self.RQ_offset)
-        T = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
-        Qvectors = np.array([[self.Qux, self.Qvx],[self.Quy, self.Qvy]])
-        Rvectors = np.matmul(T,Qvectors)
-        self.Rux = Rvectors[0,0]
-        self.Ruy = Rvectors[1,0]
-        self.Rvx = Rvectors[0,1]
-        self.Rvy = Rvectors[1,1]
+        T = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+        Qvectors = np.array([[self.Qux, self.Qvx], [self.Quy, self.Qvy]])
+        Rvectors = np.matmul(T, Qvectors)
+        self.Rux = Rvectors[0, 0]
+        self.Ruy = Rvectors[1, 0]
+        self.Rvx = Rvectors[0, 1]
+        self.Rvy = Rvectors[1, 1]
 
         if self.flip:
             self.Ruy = -self.Ruy
@@ -91,24 +93,21 @@ class RQ_axes(object):
             Rux         (float) the x coodinate of u in real space
             Ruy         (float) the y coodinate of u in real space
         """
-        length = np.hypot(Rux,Ruy)
-        self.Rux = Rux/length
-        self.Ruy = Ruy/length
+        length = np.hypot(Rux, Ruy)
+        self.Rux = Rux / length
+        self.Ruy = Ruy / length
         self.Rvx = -self.Ruy
         self.Rvy = self.Rux
 
         theta = np.radians(self.RQ_offset)
-        T = np.array([[np.cos(theta), np.sin(theta)],[-np.sin(theta), np.cos(theta)]])
-        Rvectors = np.array([[self.Rux, self.Rvx],[self.Ruy, self.Rvy]])
-        Qvectors = np.matmul(T,Rvectors)
-        self.Qux = Qvectors[0,0]
-        self.Quy = Qvectors[1,0]
-        self.Qvx = Qvectors[0,1]
-        self.Qvy = Qvectors[1,1]
+        T = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]])
+        Rvectors = np.array([[self.Rux, self.Rvx], [self.Ruy, self.Rvy]])
+        Qvectors = np.matmul(T, Rvectors)
+        self.Qux = Qvectors[0, 0]
+        self.Quy = Qvectors[1, 0]
+        self.Qvx = Qvectors[0, 1]
+        self.Qvy = Qvectors[1, 1]
 
         if self.flip:
             self.Quy = -self.Quy
             self.Qvy = -self.Qvy
-
-
-

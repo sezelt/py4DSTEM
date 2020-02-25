@@ -8,9 +8,9 @@ This file is part of the PTYPY package.
 """
 import os
 
-__all__ = ['Param', 'asParam']  # 'load',]
+__all__ = ["Param", "asParam"]  # 'load',]
 
-PARAM_PREFIX = 'pars'
+PARAM_PREFIX = "pars"
 
 
 class Param(dict):
@@ -33,6 +33,7 @@ class Param(dict):
     new references. This will lead inconsistency if other objects refer to dicts or Params
     in the updated Param instance. 
     """
+
     _display_items_as_attributes = True
     _PREFIX = PARAM_PREFIX
 
@@ -42,7 +43,8 @@ class Param(dict):
         Same constructor as dict.
         """
         dict.__init__(self)
-        if __d__ is not None: self.update(__d__)
+        if __d__ is not None:
+            self.update(__d__)
         self.update(kwargs)
 
     def __getstate__(self):
@@ -92,7 +94,8 @@ class Param(dict):
         d = Param(self)
         if depth > 0:
             for k, v in d.iteritems():
-                if isinstance(v, self.__class__): d[k] = v.copy(depth - 1)
+                if isinstance(v, self.__class__):
+                    d[k] = v.copy(depth - 1)
         return d
 
     def __dir__(self):
@@ -131,14 +134,18 @@ class Param(dict):
 
         def _k_v_update(k, v):
             # If an element is itself a dict, convert it to Param
-            if Convert and hasattr(v, 'keys'):
+            if Convert and hasattr(v, "keys"):
                 # print 'converting'
                 v = Param(v)
-            # new key 
+            # new key
             if not k in self:
                 self[k] = v
             # If this key already exists and is already dict-like, update it
-            elif in_place_depth > 0 and hasattr(v, 'keys') and isinstance(self[k], self.__class__):
+            elif (
+                in_place_depth > 0
+                and hasattr(v, "keys")
+                and isinstance(self[k], self.__class__)
+            ):
                 self[k].update(v, in_place_depth - 1)
                 """
                 if isinstance(self[k],self.__class__):
@@ -153,7 +160,7 @@ class Param(dict):
                 self[k] = v
 
         if __d__ is not None:
-            if hasattr(__d__, 'keys'):
+            if hasattr(__d__, "keys"):
                 # Iterate through dict-like argument
                 for k, v in __d__.items():
                     _k_v_update(k, v)
@@ -177,7 +184,8 @@ class Param(dict):
         else:
             d = dict(self)
             for k, v in d.items():
-                if isinstance(v, self.__class__): d[k] = v._to_dict(Recursive)
+                if isinstance(v, self.__class__):
+                    d[k] = v._to_dict(Recursive)
         return d
 
     @classmethod
@@ -200,28 +208,31 @@ def validate_standard_param(sp, p=None, prefix=None):
     if p is None:
         good = True
         for k, v in sp.iteritems():
-            if k.startswith('_'): continue
+            if k.startswith("_"):
+                continue
             if type(v) == type(sp):
-                pref = k if prefix is None else '.'.join([prefix, k])
+                pref = k if prefix is None else ".".join([prefix, k])
                 good &= validate_standard_param(v, prefix=pref)
                 continue
             else:
                 try:
                     a, b, c = v
                     if prefix is not None:
-                        print('    %s.%s = %s' % (prefix, k, str(v)))
+                        print("    %s.%s = %s" % (prefix, k, str(v)))
                     else:
-                        print('    %s = %s' % (k, str(v)))
+                        print("    %s = %s" % (k, str(v)))
                 except:
                     good = False
                     if prefix is not None:
-                        print('!!! %s.%s = %s <--- Incorrect' % (prefix, k, str(v)))
+                        print("!!! %s.%s = %s <--- Incorrect" % (prefix, k, str(v)))
                     else:
-                        print('!!! %s = %s <--- Incorrect' % (k, str(v)))
+                        print("!!! %s = %s <--- Incorrect" % (k, str(v)))
 
         return good
     else:
-        raise RuntimeError('Checking if a param fits with a standard is not yet implemented')
+        raise RuntimeError(
+            "Checking if a param fits with a standard is not yet implemented"
+        )
 
 
 def format_standard_param(p):
@@ -230,14 +241,15 @@ def format_standard_param(p):
     """
     lines = []
     if not validate_standard_param(p):
-        print('Standard parameter does not')
+        print("Standard parameter does not")
     for k, v in p.iteritems():
-        if k.startswith('_'): continue
+        if k.startswith("_"):
+            continue
         if type(v) == type(p):
             sublines = format_standard_param(v)
-            lines += [k + '.' + s for s in sublines]
+            lines += [k + "." + s for s in sublines]
         else:
-            lines += ['%s = %s #[%s] %s' % (k, str(v[1]), v[0], v[2])]
+            lines += ["%s = %s #[%s] %s" % (k, str(v[1]), v[0], v[2])]
     return lines
 
 

@@ -8,7 +8,8 @@ from ...file.datastructure import PointListArray
 from ..braggdiskdetection import get_bragg_vector_map
 from ..utils import get_CoM, add_to_2D_array_from_floats
 
-def get_diffraction_shifts(Braggpeaks, Q_Nx, Q_Ny, findcenter='CoM'):
+
+def get_diffraction_shifts(Braggpeaks, Q_Nx, Q_Ny, findcenter="CoM"):
     """
     Gets the diffraction shifts.
 
@@ -32,50 +33,59 @@ def get_diffraction_shifts(Braggpeaks, Q_Nx, Q_Ny, findcenter='CoM'):
                         identified with the unscattered beam. Useful for diagnostic purposes.
     """
     assert isinstance(Braggpeaks, PointListArray), "Braggpeaks must be a PointListArray"
-    assert all([isinstance(item, (int,np.integer)) for item in [Q_Nx,Q_Ny]])
+    assert all([isinstance(item, (int, np.integer)) for item in [Q_Nx, Q_Ny]])
     assert isinstance(findcenter, str), "center must be a str"
-    assert findcenter in ['CoM','max'], "center must be either 'CoM' or 'max'"
-    R_Nx,R_Ny = Braggpeaks.shape
+    assert findcenter in ["CoM", "max"], "center must be either 'CoM' or 'max'"
+    R_Nx, R_Ny = Braggpeaks.shape
 
     # Get guess at position of unscattered beam
     braggvectormap_all = get_bragg_vector_map(Braggpeaks, Q_Nx, Q_Ny)
-    if findcenter=='max':
-        x0,y0 = np.unravel_index(np.argmax(gaussian_filter(braggvectormap_all,10)),(Q_Nx,Q_Ny))
+    if findcenter == "max":
+        x0, y0 = np.unravel_index(
+            np.argmax(gaussian_filter(braggvectormap_all, 10)), (Q_Nx, Q_Ny)
+        )
     else:
-        x0,y0 = get_CoM(braggvectormap_all)
+        x0, y0 = get_CoM(braggvectormap_all)
         braggvectormap = np.zeros_like(braggvectormap_all)
         for Rx in range(R_Nx):
             for Ry in range(R_Ny):
-                pointlist = Braggpeaks.get_pointlist(Rx,Ry)
+                pointlist = Braggpeaks.get_pointlist(Rx, Ry)
                 if pointlist.length > 0:
-                    r2 = (pointlist.data['qx']-x0)**2 + (pointlist.data['qy']-y0)**2
+                    r2 = (pointlist.data["qx"] - x0) ** 2 + (
+                        pointlist.data["qy"] - y0
+                    ) ** 2
                     index = np.argmin(r2)
-                    braggvectormap = add_to_2D_array_from_floats(braggvectormap,
-                                                                pointlist.data['qx'][index],
-                                                                pointlist.data['qy'][index],
-                                                                pointlist.data['intensity'][index])
-        x0,y0 = get_CoM(braggvectormap)
+                    braggvectormap = add_to_2D_array_from_floats(
+                        braggvectormap,
+                        pointlist.data["qx"][index],
+                        pointlist.data["qy"][index],
+                        pointlist.data["intensity"][index],
+                    )
+        x0, y0 = get_CoM(braggvectormap)
 
     # Get Bragg peak closest to unscattered beam at each scan position
     braggvectormap = np.zeros_like(braggvectormap_all)
-    xshifts = np.zeros((R_Nx,R_Ny))
-    yshifts = np.zeros((R_Nx,R_Ny))
+    xshifts = np.zeros((R_Nx, R_Ny))
+    yshifts = np.zeros((R_Nx, R_Ny))
     for Rx in range(R_Nx):
         for Ry in range(R_Ny):
-            pointlist = Braggpeaks.get_pointlist(Rx,Ry)
+            pointlist = Braggpeaks.get_pointlist(Rx, Ry)
             if pointlist.length > 0:
-                r2 = (pointlist.data['qx']-x0)**2 + (pointlist.data['qy']-y0)**2
+                r2 = (pointlist.data["qx"] - x0) ** 2 + (pointlist.data["qy"] - y0) ** 2
                 index = np.argmin(r2)
-                braggvectormap = add_to_2D_array_from_floats(braggvectormap,
-                                                            pointlist.data['qx'][index],
-                                                            pointlist.data['qy'][index],
-                                                            pointlist.data['intensity'][index])
-                xshifts[Rx,Ry] = pointlist.data['qx'][index]
-                yshifts[Rx,Ry] = pointlist.data['qy'][index]
+                braggvectormap = add_to_2D_array_from_floats(
+                    braggvectormap,
+                    pointlist.data["qx"][index],
+                    pointlist.data["qy"][index],
+                    pointlist.data["intensity"][index],
+                )
+                xshifts[Rx, Ry] = pointlist.data["qx"][index]
+                yshifts[Rx, Ry] = pointlist.data["qy"][index]
 
     xshifts -= np.average(xshifts)
     yshifts -= np.average(yshifts)
     return xshifts, yshifts, braggvectormap
+
 
 def find_outlier_shifts(xshifts, yshifts, n_sigma=10, edge_boundary=0, n_bins=50):
     """
@@ -102,46 +112,51 @@ def find_outlier_shifts(xshifts, yshifts, n_sigma=10, edge_boundary=0, n_bins=50
     """
     # Get score
     score = np.zeros_like(xshifts)
-    score += np.abs(xshifts-np.roll(xshifts,(-1, 0),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,( 1, 0),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,( 0,-1),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,( 0, 1),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,(-1,-1),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,( 1,-1),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,(-1, 1),axis=(0,1))) + \
-             np.abs(xshifts-np.roll(xshifts,( 1, 1),axis=(0,1)))
-    score += np.abs(yshifts-np.roll(yshifts,(-1, 0),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,( 1, 0),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,( 0,-1),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,( 0, 1),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,(-1,-1),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,( 1,-1),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,(-1, 1),axis=(0,1))) + \
-             np.abs(yshifts-np.roll(yshifts,( 1, 1),axis=(0,1)))
+    score += (
+        np.abs(xshifts - np.roll(xshifts, (-1, 0), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (1, 0), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (0, -1), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (0, 1), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (-1, -1), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (1, -1), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (-1, 1), axis=(0, 1)))
+        + np.abs(xshifts - np.roll(xshifts, (1, 1), axis=(0, 1)))
+    )
+    score += (
+        np.abs(yshifts - np.roll(yshifts, (-1, 0), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (1, 0), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (0, -1), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (0, 1), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (-1, -1), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (1, -1), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (-1, 1), axis=(0, 1)))
+        + np.abs(yshifts - np.roll(yshifts, (1, 1), axis=(0, 1)))
+    )
 
     # Make histogram
-    bins = np.linspace(0,np.max(score),n_bins)
-    n,bins = np.histogram(score,bins=bins)
-    width = bins[1]-bins[0]
+    bins = np.linspace(0, np.max(score), n_bins)
+    n, bins = np.histogram(score, bins=bins)
+    width = bins[1] - bins[0]
 
     # Fit gaussian
-    fitfunc = lambda p,x: p[0]*np.exp(-0.5*((x-p[1])/p[2])**2)
-    errfunc = lambda p,x,y: fitfunc(p,x) - y
-    p0_0 = np.max(gaussian_filter(n,2))
-    p0_1 = np.average(bins[:-1]+width/2.,weights=n)
-    p0_2 = np.sqrt(np.average((bins[:-1]+width/2. - p0_1)**2,weights=n))
-    p0 = [p0_0,p0_1,p0_2]
-    p1,success = leastsq(errfunc, p0, args=(bins[:-1]+width/2.,n))
+    fitfunc = lambda p, x: p[0] * np.exp(-0.5 * ((x - p[1]) / p[2]) ** 2)
+    errfunc = lambda p, x, y: fitfunc(p, x) - y
+    p0_0 = np.max(gaussian_filter(n, 2))
+    p0_1 = np.average(bins[:-1] + width / 2.0, weights=n)
+    p0_2 = np.sqrt(np.average((bins[:-1] + width / 2.0 - p0_1) ** 2, weights=n))
+    p0 = [p0_0, p0_1, p0_2]
+    p1, success = leastsq(errfunc, p0, args=(bins[:-1] + width / 2.0, n))
 
     # Get mask and return
-    cutoff = p1[2]*n_sigma
+    cutoff = p1[2] * n_sigma
     mask = score > cutoff
-    mask[:edge_boundary,:] = True
-    mask[-edge_boundary:,:] = True
-    mask[:,:edge_boundary] = True
-    mask[:,-edge_boundary:] = True
+    mask[:edge_boundary, :] = True
+    mask[-edge_boundary:, :] = True
+    mask[:, :edge_boundary] = True
+    mask[:, -edge_boundary:] = True
 
     return mask, n, bins, cutoff
+
 
 def shift_braggpeaks(Braggpeaks, xshifts, yshifts):
     """
@@ -156,17 +171,14 @@ def shift_braggpeaks(Braggpeaks, xshifts, yshifts):
         shifted_Braggpeaks  (PointListArray) the shifted Bragg peaks
     """
     assert isinstance(Braggpeaks, PointListArray)
-    shifted_Braggpeaks = Braggpeaks.copy(name=Braggpeaks.name+"_shiftcorrected")
+    shifted_Braggpeaks = Braggpeaks.copy(name=Braggpeaks.name + "_shiftcorrected")
 
     for Rx in range(shifted_Braggpeaks.shape[0]):
         for Ry in range(shifted_Braggpeaks.shape[1]):
-            pointlist = shifted_Braggpeaks.get_pointlist(Rx,Ry)
-            shifts_qx = xshifts[Rx,Ry]
-            shifts_qy = yshifts[Rx,Ry]
-            pointlist.data['qx'] -= shifts_qx
-            pointlist.data['qy'] -= shifts_qy
+            pointlist = shifted_Braggpeaks.get_pointlist(Rx, Ry)
+            shifts_qx = xshifts[Rx, Ry]
+            shifts_qy = yshifts[Rx, Ry]
+            pointlist.data["qx"] -= shifts_qx
+            pointlist.data["qy"] -= shifts_qy
 
     return shifted_Braggpeaks
-
-
-

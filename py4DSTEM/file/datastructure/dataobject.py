@@ -1,6 +1,6 @@
 # Defines the DataObject class.
 #
-# The purpose of the DataObject class is to create a single, uniform interface for all of the types 
+# The purpose of the DataObject class is to create a single, uniform interface for all of the types
 # of data py4DSTEM creates. It enables:
 #       -naming dataobjects
 #       -searching, listing, and retrieving dataobjects in memory, by name or by child class type
@@ -9,8 +9,8 @@
 # All objects containing py4DSTEM data - e.g. DataCube, DiffractionSlice, RealSlice, and PointLists
 # - inherit from DataObject.
 
-#from ..log import Logger
-#logger = Logger()
+# from ..log import Logger
+# logger = Logger()
 
 import weakref
 from functools import wraps
@@ -22,16 +22,18 @@ def show_object_list(method):
     def wrapper(*args, show=False, **kwargs):
         objectlist = method(*args, **kwargs)
         if show:
-            print("{:^8}{:^36}{:^20}".format('Index', 'Name', 'Type'))
+            print("{:^8}{:^36}{:^20}".format("Index", "Name", "Type"))
             for item in objectlist:
-                print("{:^8}{:<36s}{:<20}".format(item[0],item[1],item[2].__name__))
+                print("{:^8}{:<36s}{:<20}".format(item[0], item[1], item[2].__name__))
             return
         else:
             return objectlist
+
     return wrapper
 
 
 ################## BEGIN DataObject CLASS ###################
+
 
 class DataObject(object):
     """
@@ -42,9 +44,10 @@ class DataObject(object):
     If the searchable keyword is set to False, a dataobject will not be tracked by the DataObject
     class and will not be found or returned by its search methods.
     """
+
     _instances = []
 
-    def __init__(self, name='', metadata=None, searchable=True, **kwargs):
+    def __init__(self, name="", metadata=None, searchable=True, **kwargs):
         """
         Instantiate a DataObject instance.
 
@@ -60,7 +63,7 @@ class DataObject(object):
             self.metadata = metadata.metadata
         else:
             self.metadata = None
-        if searchable==True:
+        if searchable == True:
             self._instances.append(weakref.ref(self))
 
     ############ Metadata methods ############
@@ -82,16 +85,17 @@ class DataObject(object):
                             self.metadata
                             if None, copies its own metadata and assigns it to self.metadata
         """
-        assert metadata is None or isinstance(metadata,(Metadata,DataObject))
+        assert metadata is None or isinstance(metadata, (Metadata, DataObject))
 
         if metadata is None:
             metadata = self.metadata
-        elif isinstance(metadata,DataObject):
-            assert isinstance(metadata.metadata,Metadata), "The DataObject selected does not have an associated Metadata instance."
+        elif isinstance(metadata, DataObject):
+            assert isinstance(
+                metadata.metadata, Metadata
+            ), "The DataObject selected does not have an associated Metadata instance."
             metadata = metadata.metadata
 
         self.metadata = metadata.copy()
-
 
     ############ Searching methods ############
 
@@ -109,7 +113,7 @@ class DataObject(object):
             else:
                 remove.append(i)
         for i in range(len(remove)):
-            del(cls._instances[remove[::-1][i]])
+            del cls._instances[remove[::-1][i]]
         return dataobjects
 
     @staticmethod
@@ -123,7 +127,9 @@ class DataObject(object):
         dataobject_list = []
         for index in range(len(dataobjects)):
             dataobject = dataobjects[index]
-            assert isinstance(dataobject, DataObject), "{} is not a DataObject instance".format(dataobject)
+            assert isinstance(
+                dataobject, DataObject
+            ), "{} is not a DataObject instance".format(dataobject)
             name = dataobject.name
             objecttype = type(dataobject)
             dataobject_list.append([index, name, objecttype, dataobject])
@@ -137,23 +143,24 @@ class DataObject(object):
     @show_object_list
     def sort_dataobjects_by_name():
         dataobject_list = DataObject.get_dataobject_list()
-        return [item for item in dataobject_list if item[1]!=''] + \
-               [item for item in dataobject_list if item[1]=='']
+        return [item for item in dataobject_list if item[1] != ""] + [
+            item for item in dataobject_list if item[1] == ""
+        ]
 
     @staticmethod
     @show_object_list
     def sort_dataobjects_by_type(objecttype=None):
         dataobject_list = DataObject.get_dataobject_list()
         if objecttype is None:
-            types=[]
+            types = []
             for item in dataobject_list:
                 if item[2] not in types:
                     types.append(item[2])
-            l=[]
+            l = []
             for objecttype in types:
-                l += [item for item in dataobject_list if item[2]==objecttype]
+                l += [item for item in dataobject_list if item[2] == objecttype]
         else:
-            l = [item for item in dataobject_list if item[2]==objecttype]
+            l = [item for item in dataobject_list if item[2] == objecttype]
         return l
 
     @staticmethod
@@ -176,8 +183,3 @@ class DataObject(object):
     def get_dataobject_by_type(objecttype):
         dataobject_list = DataObject.get_dataobject_list()
         return [item[3] for item in dataobject_list if isinstance(item[3], objecttype)]
-
-
-
-
-

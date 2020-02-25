@@ -6,6 +6,7 @@ from ...file.datastructure import DataCube
 
 ############################# DPC Functions ################################
 
+
 def get_CoM_images(datacube, mask=None, normalize=True):
     """
     Calculates two images - center of mass x and y - from a 4D-STEM datacube.
@@ -25,21 +26,21 @@ def get_CoM_images(datacube, mask=None, normalize=True):
     assert isinstance(normalize, bool)
 
     # Coordinates
-    qy,qx = np.meshgrid(np.arange(datacube.Q_Ny),np.arange(datacube.Q_Nx))
+    qy, qx = np.meshgrid(np.arange(datacube.Q_Ny), np.arange(datacube.Q_Nx))
     if mask is not None:
         qx *= mask
         qy *= mask
 
     # Get CoM
-    CoMx = np.zeros((datacube.R_Nx,datacube.R_Ny))
-    CoMy = np.zeros((datacube.R_Nx,datacube.R_Ny))
-    mass = np.zeros((datacube.R_Nx,datacube.R_Ny))
+    CoMx = np.zeros((datacube.R_Nx, datacube.R_Ny))
+    CoMy = np.zeros((datacube.R_Nx, datacube.R_Ny))
+    mass = np.zeros((datacube.R_Nx, datacube.R_Ny))
     for Rx in range(datacube.R_Nx):
         for Ry in range(datacube.R_Ny):
-            DP = datacube.data[Rx,Ry,:,:]
-            mass[Rx,Ry] = np.sum(DP*mask)
-            CoMx[Rx,Ry] = np.sum(qx*DP) / mass[Rx,Ry]
-            CoMy[Rx,Ry] = np.sum(qy*DP) / mass[Rx,Ry]
+            DP = datacube.data[Rx, Ry, :, :]
+            mass[Rx, Ry] = np.sum(DP * mask)
+            CoMx[Rx, Ry] = np.sum(qx * DP) / mass[Rx, Ry]
+            CoMy[Rx, Ry] = np.sum(qy * DP) / mass[Rx, Ry]
 
     if normalize:
         CoMx -= np.mean(CoMx)
@@ -47,8 +48,10 @@ def get_CoM_images(datacube, mask=None, normalize=True):
 
     return CoMx, CoMy
 
-def get_rotation_and_flip_zerocurl(CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=1,
-                                                                       return_costs=False):
+
+def get_rotation_and_flip_zerocurl(
+    CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=1, return_costs=False
+):
     """
     Find the rotation offset between real space and diffraction space, and whether there exists a
     relative axis flip their coordinate systems, starting from the premise that the CoM changes
@@ -88,15 +91,31 @@ def get_rotation_and_flip_zerocurl(CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=
         costs_f         (float) returned iff return_costs is True. The cost values for flip=False
     """
     # Cost function coefficients, with / without flip
-    term1 = np.roll(CoMx,(0,-1),axis=(0,1)) - np.roll(CoMx,( 0,+1),axis=(0,1)) + \
-            np.roll(CoMy,(1, 0),axis=(0,1)) - np.roll(CoMy,(-1, 0),axis=(0,1))
-    term2 = np.roll(CoMx,(1, 0),axis=(0,1)) - np.roll(CoMx,(-1, 0),axis=(0,1)) + \
-            np.roll(CoMy,(0, 1),axis=(0,1)) - np.roll(CoMy,( 0,-1),axis=(0,1))
+    term1 = (
+        np.roll(CoMx, (0, -1), axis=(0, 1))
+        - np.roll(CoMx, (0, +1), axis=(0, 1))
+        + np.roll(CoMy, (1, 0), axis=(0, 1))
+        - np.roll(CoMy, (-1, 0), axis=(0, 1))
+    )
+    term2 = (
+        np.roll(CoMx, (1, 0), axis=(0, 1))
+        - np.roll(CoMx, (-1, 0), axis=(0, 1))
+        + np.roll(CoMy, (0, 1), axis=(0, 1))
+        - np.roll(CoMy, (0, -1), axis=(0, 1))
+    )
 
-    term1_f = np.roll( CoMx,(0,-1),axis=(0,1)) - np.roll( CoMx,( 0,+1),axis=(0,1)) + \
-              np.roll(-CoMy,(1, 0),axis=(0,1)) - np.roll(-CoMy,(-1, 0),axis=(0,1))
-    term2_f = np.roll( CoMx,(1, 0),axis=(0,1)) - np.roll( CoMx,(-1, 0),axis=(0,1)) + \
-              np.roll(-CoMy,(0, 1),axis=(0,1)) - np.roll(-CoMy,( 0,-1),axis=(0,1))
+    term1_f = (
+        np.roll(CoMx, (0, -1), axis=(0, 1))
+        - np.roll(CoMx, (0, +1), axis=(0, 1))
+        + np.roll(-CoMy, (1, 0), axis=(0, 1))
+        - np.roll(-CoMy, (-1, 0), axis=(0, 1))
+    )
+    term2_f = (
+        np.roll(CoMx, (1, 0), axis=(0, 1))
+        - np.roll(CoMx, (-1, 0), axis=(0, 1))
+        + np.roll(-CoMy, (0, 1), axis=(0, 1))
+        - np.roll(-CoMy, (0, -1), axis=(0, 1))
+    )
 
     # Gradient descent
 
@@ -105,22 +124,28 @@ def get_rotation_and_flip_zerocurl(CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=
     theta = 0
     for i in range(n_iter):
         thetas[i] = theta
-        gradAll = stepsize * ( term1*np.cos(theta) + term2*np.sin(theta)) * \
-                             (-term1*np.sin(theta) + term2*np.cos(theta))
+        gradAll = (
+            stepsize
+            * (term1 * np.cos(theta) + term2 * np.sin(theta))
+            * (-term1 * np.sin(theta) + term2 * np.cos(theta))
+        )
         grad = np.mean(gradAll)
-        theta -= grad*stepsize
-        costs[i] = np.mean((term1*np.cos(theta) + term2*np.sin(theta))**2)
+        theta -= grad * stepsize
+        costs[i] = np.mean((term1 * np.cos(theta) + term2 * np.sin(theta)) ** 2)
 
     thetas_f = np.zeros(n_iter)
     costs_f = np.zeros(n_iter)
     theta = 0
     for i in range(n_iter):
         thetas_f[i] = theta
-        gradAll = stepsize * ( term1_f*np.cos(theta) + term2_f*np.sin(theta)) * \
-                             (-term1_f*np.sin(theta) + term2_f*np.cos(theta))
+        gradAll = (
+            stepsize
+            * (term1_f * np.cos(theta) + term2_f * np.sin(theta))
+            * (-term1_f * np.sin(theta) + term2_f * np.cos(theta))
+        )
         grad = np.mean(gradAll)
-        theta -= grad*stepsize
-        costs_f[i] = np.mean((term1_f*np.cos(theta) + term2_f*np.sin(theta))**2)
+        theta -= grad * stepsize
+        costs_f[i] = np.mean((term1_f * np.cos(theta) + term2_f * np.sin(theta)) ** 2)
 
     # Get rotation and flip
     if costs_f[-1] < costs[-1]:
@@ -135,9 +160,19 @@ def get_rotation_and_flip_zerocurl(CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=
     else:
         return theta, flip
 
-def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2, regLowPass=0.5,
-                                      regHighPass=100, stepsize=1, n_iter=1, return_stds=False,
-                                      verbose=True):
+
+def get_rotation_and_flip_maxcontrast(
+    CoMx,
+    CoMy,
+    N_thetas,
+    paddingfactor=2,
+    regLowPass=0.5,
+    regHighPass=100,
+    stepsize=1,
+    n_iter=1,
+    return_stds=False,
+    verbose=True,
+):
     """
     Find the rotation offset between real space and diffraction space, and whether there exists a
     relative axis flip their coordinate systems, starting from the premise that the contrast of the
@@ -181,31 +216,53 @@ def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2, reg
                         descent step for flip=False
         stds_f         (float) returned iff return_costs is True. The cost values for flip=False
     """
-    thetas = np.linspace(0,2*np.pi,N_thetas)
+    thetas = np.linspace(0, 2 * np.pi, N_thetas)
     stds = np.zeros(N_thetas)
     stds_f = np.zeros(N_thetas)
 
     # Unflipped
-    for i,theta in enumerate(thetas):
-        phase, error = get_phase_from_CoM(CoMx, CoMy, theta=theta, flip=False,
-                                          regLowPass=regLowPass, regHighPass=regHighPass,
-                                          paddingfactor=paddingfactor, stepsize=stepsize,
-                                          n_iter=n_iter)
+    for i, theta in enumerate(thetas):
+        phase, error = get_phase_from_CoM(
+            CoMx,
+            CoMy,
+            theta=theta,
+            flip=False,
+            regLowPass=regLowPass,
+            regHighPass=regHighPass,
+            paddingfactor=paddingfactor,
+            stepsize=stepsize,
+            n_iter=n_iter,
+        )
         stds[i] = np.std(phase)
         if verbose:
-            print_progress_bar(i+1, 2*N_thetas, prefix='Analyzing:', suffix='Complete.', length=50)
+            print_progress_bar(
+                i + 1, 2 * N_thetas, prefix="Analyzing:", suffix="Complete.", length=50
+            )
 
     # Flipped
-    for i,theta in enumerate(thetas):
-        phase, error = get_phase_from_CoM(CoMx, CoMy, theta=theta, flip=True,
-                                          regLowPass=regLowPass, regHighPass=regHighPass,
-                                          paddingfactor=paddingfactor, stepsize=stepsize,
-                                          n_iter=n_iter)
+    for i, theta in enumerate(thetas):
+        phase, error = get_phase_from_CoM(
+            CoMx,
+            CoMy,
+            theta=theta,
+            flip=True,
+            regLowPass=regLowPass,
+            regHighPass=regHighPass,
+            paddingfactor=paddingfactor,
+            stepsize=stepsize,
+            n_iter=n_iter,
+        )
         stds_f[i] = np.std(phase)
         if verbose:
-            print_progress_bar(N_thetas+i+1, 2*N_thetas, prefix='Analyzing:', suffix='Complete.', length=50)
+            print_progress_bar(
+                N_thetas + i + 1,
+                2 * N_thetas,
+                prefix="Analyzing:",
+                suffix="Complete.",
+                length=50,
+            )
 
-    flip = np.max(stds_f)>np.max(stds)
+    flip = np.max(stds_f) > np.max(stds)
     if flip:
         theta = thetas[np.argmax(stds_f)]
     else:
@@ -216,8 +273,19 @@ def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2, reg
     else:
         return theta, flip
 
-def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100, paddingfactor=2,
-                                                stepsize=1, n_iter=10, phase_init=None):
+
+def get_phase_from_CoM(
+    CoMx,
+    CoMy,
+    theta,
+    flip,
+    regLowPass=0.5,
+    regHighPass=100,
+    paddingfactor=2,
+    stepsize=1,
+    n_iter=10,
+    phase_init=None,
+):
     """
     Calculate the phase of the sample transmittance from the diffraction centers of mass.
     A bare bones description of the approach taken here is below - for detailed discussion of the
@@ -258,45 +326,45 @@ def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100,
         error           (1D array) the error - RMSD of the phase gradients compared to the CoM - at
                         each iteration step
     """
-    assert isinstance(flip,bool)
-    assert isinstance(paddingfactor,(int,np.integer))
-    assert isinstance(n_iter,(int,np.integer))
+    assert isinstance(flip, bool)
+    assert isinstance(paddingfactor, (int, np.integer))
+    assert isinstance(n_iter, (int, np.integer))
 
     # Coordinates
-    R_Nx,R_Ny = CoMx.shape
-    R_Nx_padded,R_Ny_padded = R_Nx*paddingfactor,R_Ny*paddingfactor
-    qx,qy = make_Fourier_coords2D(R_Nx_padded,R_Ny_padded,pixelSize=1)
-    qr2 = qx**2 + qy**2
+    R_Nx, R_Ny = CoMx.shape
+    R_Nx_padded, R_Ny_padded = R_Nx * paddingfactor, R_Ny * paddingfactor
+    qx, qy = make_Fourier_coords2D(R_Nx_padded, R_Ny_padded, pixelSize=1)
+    qr2 = qx ** 2 + qy ** 2
 
     # Invese operators
-    denominator = qr2 + regHighPass + qr2**2*regLowPass
-    _ = np.seterr(divide='ignore')
-    denominator = 1./denominator
-    denominator[0,0] = 0
-    _ = np.seterr(divide='warn')
+    denominator = qr2 + regHighPass + qr2 ** 2 * regLowPass
+    _ = np.seterr(divide="ignore")
+    denominator = 1.0 / denominator
+    denominator[0, 0] = 0
+    _ = np.seterr(divide="warn")
     f = 1j * 0.25 * stepsize
-    qxOperator = f*qx*denominator
-    qyOperator = f*qy*denominator
+    qxOperator = f * qx * denominator
+    qyOperator = f * qy * denominator
 
     # Perform rotation and flipping
     if not flip:
-        CoMx_rot = CoMx*np.cos(theta) - CoMy*np.sin(theta)
-        CoMy_rot = CoMx*np.sin(theta) + CoMy*np.cos(theta)
+        CoMx_rot = CoMx * np.cos(theta) - CoMy * np.sin(theta)
+        CoMy_rot = CoMx * np.sin(theta) + CoMy * np.cos(theta)
     if flip:
-        CoMx_rot = CoMx*np.cos(theta) + CoMy*np.sin(theta)
-        CoMy_rot = CoMx*np.sin(theta) - CoMy*np.cos(theta)
+        CoMx_rot = CoMx * np.cos(theta) + CoMy * np.sin(theta)
+        CoMy_rot = CoMx * np.sin(theta) - CoMy * np.cos(theta)
 
     # Initializations
-    phase = np.zeros((R_Nx_padded,R_Ny_padded))
-    update = np.zeros((R_Nx_padded,R_Ny_padded))
-    dx = np.zeros((R_Nx_padded,R_Ny_padded))
-    dy = np.zeros((R_Nx_padded,R_Ny_padded))
+    phase = np.zeros((R_Nx_padded, R_Ny_padded))
+    update = np.zeros((R_Nx_padded, R_Ny_padded))
+    dx = np.zeros((R_Nx_padded, R_Ny_padded))
+    dy = np.zeros((R_Nx_padded, R_Ny_padded))
     error = np.zeros(n_iter)
-    mask = np.zeros((R_Nx_padded,R_Ny_padded),dtype=bool)
-    mask[:R_Nx,:R_Ny] = True
-    maskInv = mask==False
+    mask = np.zeros((R_Nx_padded, R_Ny_padded), dtype=bool)
+    mask[:R_Nx, :R_Ny] = True
+    maskInv = mask == False
     if phase_init is not None:
-        phase[:R_Nx,:R_Ny] = phase_init
+        phase[:R_Nx, :R_Ny] = phase_init
 
     # Iterative reconstruction
     for i in range(n_iter):
@@ -308,29 +376,39 @@ def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100,
         dy[maskInv] = 0
 
         # Calculate reconstruction update
-        update = np.real(np.fft.ifft2( np.fft.fft2(dx)*qxOperator + np.fft.fft2(dy)*qyOperator))
+        update = np.real(
+            np.fft.ifft2(np.fft.fft2(dx) * qxOperator + np.fft.fft2(dy) * qyOperator)
+        )
 
         # Apply update
-        phase += stepsize*update
+        phase += stepsize * update
 
         # Measure current phase gradients
-        dx = (np.roll(phase,(-1,0),axis=(0,1)) - np.roll(phase,(1,0),axis=(0,1))) / 2.
-        dy = (np.roll(phase,(0,-1),axis=(0,1)) - np.roll(phase,(0,1),axis=(0,1))) / 2.
+        dx = (
+            np.roll(phase, (-1, 0), axis=(0, 1)) - np.roll(phase, (1, 0), axis=(0, 1))
+        ) / 2.0
+        dy = (
+            np.roll(phase, (0, -1), axis=(0, 1)) - np.roll(phase, (0, 1), axis=(0, 1))
+        ) / 2.0
 
         # Estimate error from cost function, RMS deviation of gradients
         xDiff = dx[mask] - CoMx_rot.ravel()
         yDiff = dy[mask] - CoMy_rot.ravel()
-        error[i] = np.sqrt(np.mean((xDiff-np.mean(xDiff))**2 + (yDiff-np.mean(yDiff))**2))
+        error[i] = np.sqrt(
+            np.mean((xDiff - np.mean(xDiff)) ** 2 + (yDiff - np.mean(yDiff)) ** 2)
+        )
 
-    phase = phase[:R_Nx,:R_Ny]
+    phase = phase[:R_Nx, :R_Ny]
 
     return phase, error
 
 
 #################### Functions for constructing the e-beam #################
 
-def construct_illumation(shape, size, keV, aperture, ap_in_mrad=True,
-                         df=0, cs=0, c5=0, return_qspace=False):
+
+def construct_illumation(
+    shape, size, keV, aperture, ap_in_mrad=True, df=0, cs=0, c5=0, return_qspace=False
+):
     """
     Makes a probe wave function, in the sample plane.
 
@@ -357,27 +435,30 @@ def construct_illumation(shape, size, keV, aperture, ap_in_mrad=True,
                         sample plane.
     """
     # Get shapes
-    Nx,Ny = shape
-    xsize,ysize = size
+    Nx, Ny = shape
+    xsize, ysize = size
 
     # Get diffraction space coordinates
-    qsize = (float(Nx)/xsize,float(Ny)/ysize)
-    qx,qy = make_qspace_coords(shape, qsize)
-    qr = np.sqrt(qx**2 + qy**2)
+    qsize = (float(Nx) / xsize, float(Ny) / ysize)
+    qx, qy = make_qspace_coords(shape, qsize)
+    qr = np.sqrt(qx ** 2 + qy ** 2)
 
     # Get electron wavenumber and aperture size
-    k = get_wavenumber(keV*1000)
+    k = get_wavenumber(keV * 1000)
     if ap_in_mrad is True:
-        aperture = np.tan(aperture/1000)*k
+        aperture = np.tan(aperture / 1000) * k
 
     # Get the probe
-    probe = np.asarray(qr<=aperture, dtype=complex)                          # Initialize probe
-    probe *= np.exp(-1j*sph_aberration(qr, lam=1.0/k, df=df, cs=cs, c5=c5))  # Add aberrations
+    probe = np.asarray(qr <= aperture, dtype=complex)  # Initialize probe
+    probe *= np.exp(
+        -1j * sph_aberration(qr, lam=1.0 / k, df=df, cs=cs, c5=c5)
+    )  # Add aberrations
     if return_qspace is True:
         return probe
-    probe = np.fft.ifft2(probe)                                         # Convert to real space
-    probe /= np.sqrt(np.sum(np.square(np.abs(probe))))                  # Normalize
+    probe = np.fft.ifft2(probe)  # Convert to real space
+    probe /= np.sqrt(np.sum(np.square(np.abs(probe))))  # Normalize
     return probe
+
 
 def sph_aberration(qr, lam, df=0, cs=0, c5=0):
     """
@@ -398,13 +479,18 @@ def sph_aberration(qr, lam, df=0, cs=0, c5=0):
     Returns:
         chi     (float) the aberation function
     """
-    p = lam*qr
-    chi = df*np.square(p)/2.0 + cs*1e7*np.power(p,4)/4.0 + c5*1e7*np.power(p,6)/6.0
-    chi = 2*np.pi*chi/lam
+    p = lam * qr
+    chi = (
+        df * np.square(p) / 2.0
+        + cs * 1e7 * np.power(p, 4) / 4.0
+        + c5 * 1e7 * np.power(p, 6) / 6.0
+    )
+    chi = 2 * np.pi * chi / lam
     return chi
 
 
 ##################### Electron physics functions ########################
+
 
 def get_relativistic_mass_correction(E):
     """
@@ -418,8 +504,9 @@ def get_relativistic_mass_correction(E):
     Returns:
         gamma   (float) relativistic mass correction factor
     """
-    m0c2 = 5.109989461e5    # electron rest mass, in eV
-    return (m0c2 + E)/m0c2
+    m0c2 = 5.109989461e5  # electron rest mass, in eV
+    return (m0c2 + E) / m0c2
+
 
 def get_wavenumber(E):
     """
@@ -433,9 +520,10 @@ def get_wavenumber(E):
     Returns:
         k0      (float) relativistically corrected wavenumber
     """
-    hc = 1.23984193e4       # Planck's constant times the speed of light in eV Angstroms
-    m0c2 = 5.109989461e5    # electron rest mass, in eV
-    return np.sqrt( E*(E + 2*m0c2) ) / hc
+    hc = 1.23984193e4  # Planck's constant times the speed of light in eV Angstroms
+    m0c2 = 5.109989461e5  # electron rest mass, in eV
+    return np.sqrt(E * (E + 2 * m0c2)) / hc
+
 
 def get_interaction_constant(E):
     """
@@ -449,13 +537,12 @@ def get_interaction_constant(E):
     Returns:
         m       (float) relativistically corrected electron mass
     """
-    h = 6.62607004e-34      # Planck's constant in Js
-    me = 9.10938356e-31     # Electron rest mass in kg
-    qe = 1.60217662e-19     # Electron charge in C
-    k0 = get_wavenumber(E)           # Electron wavenumber in inverse Angstroms
-    gamma = get_relativistic_mass_correction(E)   # Relativistic mass correction
-    return 2*np.pi*gamma*me*qe/(k0*1e-20*h**2)
-
+    h = 6.62607004e-34  # Planck's constant in Js
+    me = 9.10938356e-31  # Electron rest mass in kg
+    qe = 1.60217662e-19  # Electron charge in C
+    k0 = get_wavenumber(E)  # Electron wavenumber in inverse Angstroms
+    gamma = get_relativistic_mass_correction(E)  # Relativistic mass correction
+    return 2 * np.pi * gamma * me * qe / (k0 * 1e-20 * h ** 2)
 
 
 ####################### Utility functions ##########################
@@ -463,15 +550,15 @@ def get_interaction_constant(E):
 # def make_qspace_coords(shape,qsize):
 #     """
 #     Creates a diffraction space coordinate grid.
-# 
+#
 #     Number of pixels in the grid (sampling) is given by shape = (Nx,Ny).
 #     Extent of the grid is given by qsize = (xsize,ysize), where xsize,ysize are in inverse length
 #     units, and are the number of pixels divided by the real space size.
-# 
+#
 #     Accepts:
 #         shape       (2-tuple of ints) grid shape
 #         qsize       (2-tuple of floats) grid size, in reciprocal length units
-# 
+#
 #     Returns:
 #         qx          (2D ndarray) the x diffraction space coordinates
 #         qy          (2D ndarray) the y diffraction space coordinates
@@ -479,63 +566,60 @@ def get_interaction_constant(E):
 #     qx = np.fft.fftfreq(shape[0])*qsize[0]
 #     qy = np.fft.fftfreq(shape[1])*qsize[1]
 #     return qx,qy
-# 
+#
 # def pad_shift(ar, x, y):
 #     """
 #     Similar to np.roll, but designed for special handling of zero padded matrices.
-# 
+#
 #     In particular, for a zero-padded matrix ar and shift values (x,y) which are equal to
 #     or less than the pad width, pad_shift is identical to np.roll.
 #     For a zero-padded matrix ar and shift values (x,y) which are greater than the pad
 #     width, values of ar which np.roll would 'wrap around' are instead set to zero.
-# 
+#
 #     For a 1D analog, np.roll and pad_shift are identical in the first case, but differ in the second:
-# 
+#
 #     Case 1:
 #         np.roll(np.array([0,0,1,1,1,0,0],2) = array([0,0,0,0,1,1,1])
 #         pad_shift(np.array([0,0,1,1,1,0,0],2) = array([0,0,0,0,1,1,1])
-# 
+#
 #     Case 2:
 #         np.roll(np.array([0,0,1,1,1,0,0],3) = array([1,0,0,0,0,1,1])
 #         pad_shift(np.array([0,0,1,1,1,0,0],3) = array([0,0,0,0,0,1,1])
-# 
+#
 #     Accepts:
 #         ar          (ndarray) a 2D array
 #         x           (int) the x shift
 #         y           (int) the y shift
-# 
+#
 #     Returns:
 #         shifted_ar  (ndarray) the shifted array
 #     """
 #     assert isinstance(x,(int,np.integer))
 #     assert isinstance(y,(int,np.integer))
-# 
+#
 #     xend,yend = np.shape(ar)
 #     xend,yend = xend-x,yend-y
-# 
+#
 #     return np.pad(ar, ((x*(x>=0),-x*(x<=0)),(y*(y>=0),-y*(y<=0))),
 #                   mode='constant')[-x*(x<=0):-x*(x>=0)+xend*(x<=0), \
 #                                    -y*(y<=0):-y*(y>=0)+yend*(y<=0)]
-# 
+#
 # def rotate_point(origin, point, angle):
 #     """
 #     Rotates point counterclockwise by angle about origin.
-# 
+#
 #     Accepts:
 #         origin          (2-tuple of floats) the (x,y) coords of the origin
 #         point           (2-tuple of floats) the (x,y) coords of the point
 #         angle           (float) the rotation angle, in radians
-# 
+#
 #     Returns:
 #         rotated_point   (2-tuple of floats) the (x,y) coords of the rotated point
 #     """
 #     ox,oy = origin
 #     px,py = point
-# 
+#
 #     qx = ox + np.cos(angle)*(px-ox) - np.sin(angle)*(py-oy)
 #     qy = oy + np.sin(angle)*(px-ox) + np.cos(angle)*(py-oy)
-# 
+#
 #     return qx,qy
-
-
-

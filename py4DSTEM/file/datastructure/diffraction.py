@@ -5,8 +5,8 @@ from collections import OrderedDict
 from .dataobject import DataObject
 from .dataslice import DataSlice
 
-class DiffractionSlice(DataSlice):
 
+class DiffractionSlice(DataSlice):
     def __init__(self, data, Q_Nx=None, Q_Ny=None, slicelabels=None, **kwargs):
         """
         Instantiate a DiffractionSlice object.  Set the data and dimensions.
@@ -33,9 +33,11 @@ class DiffractionSlice(DataSlice):
             self.Q_Ny = Q_Ny
 
         # Instantiate as DataSlice, setting up dimensions, depth, and slicelabels
-        DataSlice.__init__(self, data=data,
-                           Nx=self.Q_Nx, Ny=self.Q_Ny,
-                           slicelabels=slicelabels, **kwargs)
-
-
-
+        DataSlice.__init__(
+            self,
+            data=data,
+            Nx=self.Q_Nx,
+            Ny=self.Q_Ny,
+            slicelabels=slicelabels,
+            **kwargs
+        )
