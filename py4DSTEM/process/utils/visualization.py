@@ -76,7 +76,7 @@ def plot_bragg_disks(
 
     _ = filter_function or (lambda x: x)
 
-    for i, clr in zip(range(len(Rx)), colors):
+    for i, clr in zip(range(len(Rx)), colors()):
         c = clr["color"]
         ax[0, 0].scatter(Ry[i], Rx[i], color=c)
 
@@ -88,7 +88,8 @@ def plot_bragg_disks(
             ax.ravel()[i + 1].scatter(
                 peaks[i].data["qy"],
                 peaks[i].data["qx"],
-                color=c,
+                facecolors='none',
+                edgecolors=c,
                 s=scale
                 * peaks[i].data["intensity"]
                 / np.max(peaks[i].data["intensity"]),
