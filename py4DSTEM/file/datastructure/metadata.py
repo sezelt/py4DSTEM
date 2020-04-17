@@ -364,6 +364,8 @@ class MetadataCollection(object):
     """
     def __init__(self,name):
         self.__name__ = name
+        self.shortlist =  {}
+        self.all = {}
 
 def get_py4DSTEM_version(h5_file):
     """
