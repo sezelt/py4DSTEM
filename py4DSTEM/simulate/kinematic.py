@@ -1,6 +1,7 @@
 import numpy as np
 import pymatgen as mg
 from tqdm import tqdm
+from typing import Optional
 
 from ..process.rdf import single_atom_scatter
 from ..process.utils import electron_wavelength_angstrom
@@ -16,13 +17,13 @@ class KinematicLibrary:
     def __init__(
         self,
         structure,
-        max_index=6,
-        poles=None,
-        voltage=300_000,
-        tol_zone=0.1,
-        tol_int=10,
-        thickness=500,
-        conventional_standard_cell=True,
+        max_index: int = 6,
+        poles: Optional[np.ndarray] = None,
+        voltage: float = 300_000,
+        tol_zone: float = 0.1,
+        tol_int: float = 10,
+        thickness: float = 500,
+        conventional_standard_cell: bool = True,
         **kwargs,
     ):
         """
@@ -134,7 +135,7 @@ class KinematicLibrary:
 
     # ---------- PRIVATE METHODS ---------------- #
 
-    def _run_simulation(self):
+    def _run_simulation(self) -> None:
         # allocate pointlistarray:
         tags = {"hkl": None, "pole": None}
         coordinates = ("qx", "qy", "h", "k", "l", "intensity")
@@ -191,7 +192,7 @@ class KinematicLibrary:
 
         self.pattern_library = pla
 
-    def _compute_structure_factors(self):
+    def _compute_structure_factors(self) -> None:
         # compute Fhkl for all reflections
 
         hh, kk, ll = np.mgrid[
@@ -237,7 +238,9 @@ class KinematicLibrary:
         self.hklI = hklI
         self.hklF = hklF
 
-    def _generate_pattern(self, uvw, a=None, N=None):
+    def _generate_pattern(
+        self, uvw: np.ndarray, a: Optional[float] = None, N: Optional[int] = None
+    ) -> np.ndarray:
         # apply zone law to find reciprocal lattice points that may be excited
         # and scale structure factor by shape factor using excitation error
         pattern = np.zeros((1, 4))
@@ -276,7 +279,9 @@ class KinematicLibrary:
 
         return pattern
 
-    def _generate_transmission(self, uvw, a, N):
+    def _generate_transmission(
+        self, uvw, a: Optional[float] = None, N: Optional[int] = None
+    ) -> np.ndarray:
         # this is the same as _generate_pattern but returns the complex
         # transmission function instead of the instensity
         pattern = np.zeros((0,), dtype=self.hklF.dtype)
@@ -313,7 +318,7 @@ class KinematicLibrary:
         # thick slab and applying it iteratively, along with a propagation operator
         pass
 
-    def _shape_factor(self, s, a, N):
+    def _shape_factor(self, s: float, a: float, N: int) -> float:
         """
 		find SS*(s) for excitation error s, unit cell size a, number atoms N
 		"""
@@ -322,7 +327,7 @@ class KinematicLibrary:
         else:
             return np.sin(np.pi * s * a * N) ** 2 / np.sin(np.pi * s * a) ** 2
 
-    def _cubic_poles(self, n):
+    def _cubic_poles(self, n: int) -> np.ndarray:
         print("Using cubic symmetric poles...", flush=True)
         # generate n diffraction vectors spaced (uniformly?) within the symmetrically unique
         # subset of cubic diffraction vectors
@@ -348,7 +353,7 @@ class KinematicLibrary:
         return ijk0 @ abc
 
 
-def vector_angle(a, b):
+def vector_angle(a: np.ndarray, b: np.ndarray) -> float:
     return np.arccos((a @ b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
