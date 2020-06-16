@@ -151,46 +151,54 @@ class KinematicLibrary:
 
             uvw = self.poles[i, :]
 
-            # get the diffraction intensities for each reflection
-            pattern = self._generate_pattern(uvw)
-
-            # project reflections onto the plane defined by uvw
-            proj_points = (
-                pattern[:, 0:3]
-                - ((pattern[:, 0:3] @ uvw) / np.sqrt(np.sum(uvw ** 2)))[:, np.newaxis]
-            )
-
-            # generate two basis vectors in the plane based on the following scheme:
-            # (vectors are compared by checking their angle is below some threshold)
-            # if uvw != a*, qx <- a* projected onto the uvw plane
-            # 	else: qx <- uvw ⨉ c* projected onto the uvw plane
-
-            if vector_angle(uvw, np.array([1.0, 0.0, 0.0], dtype=uvw.dtype)) > 1e-6:
-                x = np.array([1.0, 0.0, 0.0]) - (
-                    uvw * (np.array([1.0, 0.0, 0.0]) @ uvw)
-                )
-            else:
-                x = np.array([0.0, 0.0, 1.0]) - (
-                    uvw * (np.array([0.0, 0.0, 1.0]) @ uvw)
-                )
-
-            x /= np.linalg.norm(x)
-
-            # y is mutually perpendicular to x and uvw
-            y = np.cross(uvw, x)
-            y /= np.linalg.norm(y)
-
-            # find the projections along these bases to get the diffraction spots
-            qx = proj_points @ x
-            qy = proj_points @ y
-
-            data = np.vstack((qx, qy, pattern.T)).T
-
-            pl.add_unstructured_dataarray(data)
-            pl.tags["hkl"] = uvw
-            pl.tags["pole"] = mg.core.lattice.get_integer_index(uvw, verbose=False)
+            self._generate_pattern(uvw, pointlist=pl)
 
         self.pattern_library = pla
+
+    def _generate_pattern(self, uvw: np.array, pointlist: Optional[PointList] = None):
+        # get the diffraction intensities for each reflection
+        pattern = self._get_diffraction_intensities(uvw)
+        q = pattern[:, :3] * self.recip_lat
+
+        # project reflections onto the plane defined by uvw
+        proj_points = q - ((q @ uvw) / np.sqrt(np.sum(uvw ** 2)))[:, np.newaxis]
+
+        # generate two basis vectors in the plane based on the following scheme:
+        # (vectors are compared by checking their angle is below some threshold)
+        # if uvw != a*, qx <- a* projected onto the uvw plane
+        # 	else: qx <- uvw ⨉ c* projected onto the uvw plane
+
+        if vector_angle(uvw, np.array([1.0, 0.0, 0.0], dtype=uvw.dtype)) > 1e-6:
+            x = np.array([1.0, 0.0, 0.0]) - (uvw * (np.array([1.0, 0.0, 0.0]) @ uvw))
+        else:
+            x = np.array([0.0, 0.0, 1.0]) - (uvw * (np.array([0.0, 0.0, 1.0]) @ uvw))
+
+        x /= np.linalg.norm(x)
+
+        # y is mutually perpendicular to x and uvw
+        y = np.cross(uvw, x)
+        y /= np.linalg.norm(y)
+
+        # find the projections along these bases to get the diffraction spots
+        qx = proj_points @ x
+        qy = proj_points @ y
+
+        data = np.vstack((qx, qy, pattern.T)).T
+
+        if pointlist is not None:
+            pl = pointlist
+        else:
+            tags = {"hkl": None, "pole": None}
+            coordinates = ("qx", "qy", "h", "k", "l", "intensity")
+            pl = PointList(
+                coordinates=coordinates, shape=(self.poles.shape[0], 1), tags=tags
+            )
+
+        pl.add_unstructured_dataarray(data)
+        pl.tags["hkl"] = uvw
+        pl.tags["pole"] = mg.core.lattice.get_integer_index(uvw, verbose=False)
+
+        return pl
 
     def _compute_structure_factors(self) -> None:
         # compute Fhkl for all reflections
@@ -238,7 +246,7 @@ class KinematicLibrary:
         self.hklI = hklI
         self.hklF = hklF
 
-    def _generate_pattern(
+    def _get_diffraction_intensities(
         self, uvw: np.ndarray, a: Optional[float] = None, N: Optional[int] = None
     ) -> np.ndarray:
         # apply zone law to find reciprocal lattice points that may be excited
@@ -282,7 +290,7 @@ class KinematicLibrary:
     def _generate_transmission(
         self, uvw, a: Optional[float] = None, N: Optional[int] = None
     ) -> np.ndarray:
-        # this is the same as _generate_pattern but returns the complex
+        # this is the same as _get_diffraction_intensities but returns the complex
         # transmission function instead of the instensity
         pattern = np.zeros((0,), dtype=self.hklF.dtype)
 
