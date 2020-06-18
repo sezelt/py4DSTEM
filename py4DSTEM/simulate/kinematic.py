@@ -67,7 +67,10 @@ class KinematicLibrary:
             else structure
         )
         self.struc_dict = self.structure.as_dict()
-        self.recip_lat = self.structure.lattice.reciprocal_lattice_crystallographic.abc
+        self.recip_lat = (
+            self.structure.lattice.reciprocal_lattice_crystallographic.matrix
+        )
+        self.real_lat = self.structure.lattice.matrix
 
         print("Structure used for calculation:")
         print(self.structure, flush=True)
@@ -111,7 +114,7 @@ class KinematicLibrary:
             pl = self.pattern_library.get_pointlist(x, 0)
             plt.figure(2, figsize=(6, 6))
             plt.scatter(
-                pl.data["qx"], pl.data["qy"], s=150 * np.sqrt(pl.data["intensity"])
+                pl.data["qx"], pl.data["qy"], s=50 * np.sqrt(pl.data["intensity"])
             )
             plt.axis("equal")
             plt.title(
@@ -157,10 +160,10 @@ class KinematicLibrary:
         pattern = self._get_diffraction_intensities(uvw, t=self.thickness)
 
         # extract the points in (x*,y*,z*) basis
-        q = pattern[:, :3] * self.recip_lat
+        q = pattern[:, :3] @ self.recip_lat
 
         # unit vector along the foil normal
-        k = (uvw * self.recip_lat) / np.linalg.norm(uvw * self.recip_lat)
+        k = (uvw @ self.recip_lat) / np.linalg.norm(uvw @ self.recip_lat)
 
         # project reflections onto the plane defined by uvw
         proj_points = q - ((q @ k) / np.sqrt(np.sum(k ** 2)))[:, np.newaxis]
@@ -170,10 +173,17 @@ class KinematicLibrary:
         # if uvw != a*, qx <- a* projected onto the uvw plane
         #   else: qx <- uvw ⨉ c* projected onto the uvw plane
 
-        if vector_angle(k, np.array([1.0, 0.0, 0.0], dtype=k.dtype)) > 1e-6:
-            x = np.array([1.0, 0.0, 0.0]) - (k * (np.array([1.0, 0.0, 0.0]) @ k))
+        if (
+            vector_angle(k, np.array([1.0, 0.0, 0.0], dtype=k.dtype) @ self.recip_lat)
+            > 1e-6
+        ):
+            x = (np.array([1.0, 0.0, 0.0]) @ self.recip_lat) - (
+                k * ((np.array([1.0, 0.0, 0.0]) @ self.recip_lat) @ k)
+            )
         else:
-            x = np.array([0.0, 0.0, 1.0]) - (k * (np.array([0.0, 0.0, 1.0]) @ k))
+            x = (np.array([0.0, 0.0, 1.0]) @ self.recip_lat) - (
+                k * ((np.array([0.0, 0.0, 1.0]) @ self.recip_lat) @ k)
+            )
 
         x /= np.linalg.norm(x)
 
@@ -197,8 +207,8 @@ class KinematicLibrary:
             )
 
         pl.add_unstructured_dataarray(data)
-        pl.tags["hkl"] = uvw
-        pl.tags["pole"] = mg.core.lattice.get_integer_index(uvw, verbose=False)
+        pl.tags["hkl"] = uvw.copy()
+        pl.tags["pole"] = mg.core.lattice.get_integer_index(uvw.copy(), verbose=False)
 
         return pl
 
@@ -225,6 +235,8 @@ class KinematicLibrary:
         for i in tqdm(range(hklI.shape[0]), desc="computing structure factors"):
             hkl = hklI[i, 0:3].copy()
 
+            # compute the magnitude of the g vector
+            # need to manually override for [0,0,0] since pymatgen throws an error for d_000 = inf
             q = (
                 0.0
                 if np.all(hkl == 0)
@@ -238,7 +250,10 @@ class KinematicLibrary:
                 self.scat_fac.get_scattering_factor(Z, np.array([1]), q, "A")
                 F = self.scat_fac.fe
 
-                Fhkl += F * np.exp(-2 * np.pi * 1j * (hkl @ site["abc"]))
+                # F_hkl += F * exp(-2πi (g•r))
+                Fhkl += F * np.exp(
+                    -2 * np.pi * 1j * ((hkl @ self.recip_lat) @ site["xyz"])
+                )
 
             hklI[i, 3] = np.abs(Fhkl) ** 2
 
@@ -251,12 +266,12 @@ class KinematicLibrary:
     def _get_diffraction_intensities(self, uvw: np.ndarray, t: float) -> np.ndarray:
         # apply zone law to find reciprocal lattice points that may be excited
         # and scale structure factor by shape factor using excitation error
-        pattern = np.zeros((1, 4))
+        pattern = np.zeros((0, 4))
 
         hklI = self.hklI
 
         # find unit vector along the zone axis in (x*,y*,z*) basis
-        uvw_0 = (uvw * self.recip_lat) / np.sqrt(np.sum((uvw * self.recip_lat) ** 2))
+        uvw_0 = (uvw @ self.recip_lat) / np.sqrt(np.sum((uvw @ self.recip_lat) ** 2))
 
         k0 = uvw_0 / -self.λ  # incedent wavevector in (x*,y*,z*) basis
 
@@ -267,7 +282,7 @@ class KinematicLibrary:
                 # set_trace()
                 refl = hklI[i, :].copy()  # copy of [ h, k, l, |F|^2 ]
 
-                g = refl[:3] * self.recip_lat  # g in (x*,y*,z*) basis
+                g = refl[:3] @ self.recip_lat  # g in (x*,y*,z*) basis
 
                 # excitation error from de Graef eq. 2.89
                 exc = (-1 * g @ ((2 * k0) + g)) / (
@@ -279,10 +294,13 @@ class KinematicLibrary:
                 )  # damp by shape factor D^2
                 if not np.isnan(refl[3]):
                     pattern = np.vstack((pattern, refl[np.newaxis, :]))
+            else:
+                if np.all(hklI[i, :3] == 0):
+                    set_trace()
 
-        maxInt = np.nanmax(pattern[:, 3])
+        # maxInt = np.nanmax(pattern[:, 3])
         # pattern[0, 3] = maxInt
-        pattern[:, 3] /= maxInt
+        # pattern[:, 3] /= maxInt
 
         return pattern
 
@@ -361,20 +379,22 @@ class KinematicLibrary:
 
 
 def vector_angle(a: np.ndarray, b: np.ndarray) -> float:
-    return np.arccos((a @ b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    return np.arccos(
+        np.clip((a @ b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1.0, 1.0)
+    )
 
 
 # fmt: off
 # a dictionary for converting element names into Z
-els = ('H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si',\
-       'P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni',\
-       'Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb',\
-       'Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',\
-       'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho',\
-       'Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',\
-       'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am',\
-       'Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt',\
-       'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og','Uue','Ubn','Ubn')
+els = ('H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si',
+       'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni',
+       'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb',
+       'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
+       'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho',
+       'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl',
+       'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am',
+       'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt',
+       'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og', 'Uue', 'Ubn', 'Ubn')
 
-elements = {els[i]: i+1 for i in range(len(els)) }
+elements = {els[i]: i + 1 for i in range(len(els))}
 # fmt: on
