@@ -192,14 +192,14 @@ def get_maximal_points(ar):
 
 def get_maxima_2D(
     ar,
-    sigma=0,
-    edgeBoundary=0,
-    minSpacing=0,
-    minRelativeIntensity=0,
-    minAbsoluteIntensity=0,
-    relativeToPeak=0,
-    maxNumPeaks=0,
-    subpixel=True,
+    sigma: float = 0.0,
+    edgeBoundary:int=0,
+    minSpacing:float=0,
+    minRelativeIntensity:float=0,
+    minAbsoluteIntensity:float=0,
+    relativeToPeak:int=0,
+    maxNumPeaks:int=0,
+    subpixel:bool=True,
 ):
     """
     Finds the indices where the 2D array ar is a local maximum.
@@ -265,7 +265,7 @@ def get_maxima_2D(
             maxima = np.delete(maxima, np.nonzero(deletemask)[0])
 
         # Remove maxima which are too dim relative to the brightest spot
-        if (minRelativeIntensity > 0.) & (len(maxima) > relativeToPeak):
+        if (minRelativeIntensity > 0.0) & (len(maxima) > relativeToPeak):
             assert isinstance(relativeToPeak, (int, np.integer))
             deletemask = (
                 maxima["intensity"] / maxima["intensity"][relativeToPeak]
@@ -273,8 +273,8 @@ def get_maxima_2D(
             )
             maxima = np.delete(maxima, np.nonzero(deletemask)[0])
 
-        if (minAbsoluteIntensity > 0.):
-            deletemask = ( maxima['intensity'] < minAbsoluteIntensity)
+        if minAbsoluteIntensity > 0.0:
+            deletemask = maxima["intensity"] < minAbsoluteIntensity
             maxima = np.delete(maxima, np.nonzero(deletemask)[0])
 
         # Remove maxima in excess of maxNumPeaks
