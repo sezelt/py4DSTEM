@@ -24,6 +24,7 @@ class KinematicLibrary:
         voltage: float = 300_000,
         tol_zone: float = 0.1,
         tol_int: float = 10,
+        tol_shapefactor: float = 0.01,
         thickness: float = 500,
         conventional_standard_cell: bool = True,
         **kwargs,
@@ -45,7 +46,9 @@ class KinematicLibrary:
         voltage         electron kinetic energy in Volts
 
         tol_zone        cutoff for discarding reciprocal lattice points that
-                        do not exactly satisfy Weiss zone law   
+                        do not exactly satisfy Weiss zone law (radians)
+
+        tol_shapefactor cutoff for the shape damping factor D^2 to discard a reflection
 
         tol_int         cutoff for excluding very weak structure factors
 
@@ -81,6 +84,7 @@ class KinematicLibrary:
         self.max_index = max_index
         self.tol_zone = tol_zone
         self.tol_int = tol_int
+        self.tol_shapefactor = tol_shapefactor
 
         self.thickness = thickness
 
@@ -289,18 +293,12 @@ class KinematicLibrary:
                     2 * np.linalg.norm(k0 + g) * np.cos(vector_angle(k0 + g, uvw_0))
                 )
 
-                refl[3] *= self._shape_factor(
-                    np.abs(exc), t
-                )  # damp by shape factor D^2
-                if not np.isnan(refl[3]):
-                    pattern = np.vstack((pattern, refl[np.newaxis, :]))
-            else:
-                if np.all(hklI[i, :3] == 0):
-                    set_trace()
+                shape_damping = self._shape_factor(np.abs(exc), t)
 
-        # maxInt = np.nanmax(pattern[:, 3])
-        # pattern[0, 3] = maxInt
-        # pattern[:, 3] /= maxInt
+                if shape_damping > self.tol_shapefactor:
+                    refl[3] *= shape_damping  # damp by shape factor D^2
+                    if not np.isnan(refl[3]):
+                        pattern = np.vstack((pattern, refl[np.newaxis, :]))
 
         return pattern
 
