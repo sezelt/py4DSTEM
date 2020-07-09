@@ -280,10 +280,9 @@ class KinematicLibrary:
         k0 = uvw_0 / -self.λ  # incedent wavevector in (x*,y*,z*) basis
 
         for i in range(hklI.shape[0]):
-            WZL = uvw @ hklI[i, :3]  # evaluate the Weiss zone law: [uvw] • [hkl]
+            WZL = (np.pi / 2) - vector_angle(uvw_0, hklI[i, :3])
             # check if zone law is approximately satisfied, and |F|^2 is above a threshold
             if (np.abs(WZL) < self.tol_zone) and (hklI[i, 3] > self.tol_int):
-                # set_trace()
                 refl = hklI[i, :].copy()  # copy of [ h, k, l, |F|^2 ]
 
                 g = refl[:3] @ self.recip_lat  # g in (x*,y*,z*) basis
