@@ -27,6 +27,7 @@ class KinematicLibrary:
         tol_shapefactor: float = 0.01,
         thickness: float = 500,
         conventional_standard_cell: bool = True,
+        cartesian_poles: bool = True,
         **kwargs,
     ):
         """
@@ -53,6 +54,11 @@ class KinematicLibrary:
         tol_int         cutoff for excluding very weak structure factors
 
         thickness       sample thickness in Å
+
+        cartesian_poles if True, poles are understood to be in a cartesian reciprocal space
+                        and thus will be multiplied by the inverse of the reciprocal lattive
+                        so that for non-orthogonal cells there is still a uniform spherical 
+                        mix of orientations. does that make sense?
         """
 
         if isinstance(structure, str):
@@ -103,10 +109,13 @@ class KinematicLibrary:
         else:
             self.poles = poles
 
+            if cartesian_poles:
+                self.poles = self.poles @ np.linalg.inv(self.recip_lat)
+
         # generate the library
         self._run_simulation()
 
-    def explore_library(self):
+    def explore_library(self, **kwargs):
         """
         Open an ipython interactive widget to visulaize the generated diffraction patterns
         """
@@ -116,9 +125,11 @@ class KinematicLibrary:
 
         def f(x):
             pl = self.pattern_library.get_pointlist(x, 0)
-            plt.figure(2, figsize=(6, 6))
+            plt.figure(2, dpi=kwargs.get("dpi", 100))
             plt.scatter(
-                pl.data["qx"], pl.data["qy"], s=50 * np.sqrt(pl.data["intensity"])
+                pl.data["qx"],
+                pl.data["qy"],
+                s=kwargs.get("scale", 50) * np.sqrt(pl.data["intensity"]),
             )
             plt.axis("equal")
             plt.title(
@@ -134,7 +145,7 @@ class KinematicLibrary:
                 )
 
         interactive_plot = interactive(f, x=(0, self.pattern_library.shape[0] - 1))
-        interactive_plot.children[-1].layout.height = "400px"
+        interactive_plot.children[-1].layout.height = "800px"
         display(interactive_plot)
 
     # ---------- PRIVATE METHODS ---------------- #
@@ -179,7 +190,7 @@ class KinematicLibrary:
 
         if (
             vector_angle(k, np.array([1.0, 0.0, 0.0], dtype=k.dtype) @ self.recip_lat)
-            > 1e-6
+            > 1e-4
         ):
             x = (np.array([1.0, 0.0, 0.0]) @ self.recip_lat) - (
                 k * ((np.array([1.0, 0.0, 0.0]) @ self.recip_lat) @ k)
@@ -280,7 +291,11 @@ class KinematicLibrary:
         k0 = uvw_0 / -self.λ  # incedent wavevector in (x*,y*,z*) basis
 
         for i in range(hklI.shape[0]):
-            WZL = (np.pi / 2) - vector_angle(uvw_0, hklI[i, :3])
+            WZL = (
+                0.0
+                if np.all(hklI[i, :3] == 0.0)
+                else ((np.pi / 2) - vector_angle(uvw_0, hklI[i, :3] @ self.recip_lat))
+            )
             # check if zone law is approximately satisfied, and |F|^2 is above a threshold
             if (np.abs(WZL) < self.tol_zone) and (hklI[i, 3] > self.tol_int):
                 refl = hklI[i, :].copy()  # copy of [ h, k, l, |F|^2 ]
