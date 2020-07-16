@@ -24,7 +24,7 @@ class KinematicLibrary:
         voltage: float = 300_000,
         tol_zone: float = 0.1,
         tol_int: float = 10,
-        tol_shapefactor: float = 0.01,
+        tol_shapefactor: float = 1e-4,
         thickness: float = 500,
         conventional_standard_cell: bool = True,
         cartesian_poles: bool = True,
@@ -291,13 +291,13 @@ class KinematicLibrary:
         k0 = uvw_0 / -self.λ  # incedent wavevector in (x*,y*,z*) basis
 
         for i in range(hklI.shape[0]):
-            WZL = (
-                0.0
-                if np.all(hklI[i, :3] == 0.0)
-                else ((np.pi / 2) - vector_angle(uvw_0, hklI[i, :3] @ self.recip_lat))
-            )
+            # WZL = (
+            #     0.0
+            #     if np.all(hklI[i, :3] == 0.0)
+            #     else ((np.pi / 2) - vector_angle(uvw_0, hklI[i, :3] @ self.recip_lat))
+            # )
             # check if zone law is approximately satisfied, and |F|^2 is above a threshold
-            if (np.abs(WZL) < self.tol_zone) and (hklI[i, 3] > self.tol_int):
+            if (hklI[i, 3] > self.tol_int):
                 refl = hklI[i, :].copy()  # copy of [ h, k, l, |F|^2 ]
 
                 g = refl[:3] @ self.recip_lat  # g in (x*,y*,z*) basis

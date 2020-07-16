@@ -19,20 +19,25 @@ from operator import mul
 
 from collections.abc import Iterator
 
+
 class nditer(Iterator):
-    def __init__(self,*args):
+    def __init__(self, *args):
         if len(args) > 1:
             self._it = product(*args)
         else:
             self._it = args[0]
-        self._l = reduce(mul,[a.__len__() for a in args])
+        self._l = reduce(mul, [a.__len__() for a in args])
+
     def __iter__(self):
         return self._it.__iter__()
+
     def __next__(self):
         return self._it.__next__()
+
     def __len__(self):
         return self._l
-      
-def tqdmnd(*args,**kwargs):
-    r = [range(i) if isinstance(i,int) else i for i in args]
-    return tqdm(nditer(*r),**kwargs)
+
+
+def tqdmnd(*args, **kwargs):
+    r = [range(int(i)) if type(i) in (int, float) else i for i in args]
+    return tqdm(nditer(*r), **kwargs)
