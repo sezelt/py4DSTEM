@@ -79,7 +79,7 @@ class K2DataArray(Sequence):
             Q_Nx = 1792
             Q_Ny = 1920
 
-        self.shape = (R_Nx, R_Ny, Q_Nx, Q_Ny)
+        self.shape = (int(R_Nx), int(R_Ny), int(Q_Nx), int(Q_Ny))
         self._hidden_stripe_noise_reduction = hidden_stripe_noise_reduction
 
         self._stripe_dtype = np.dtype(
