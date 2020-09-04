@@ -277,7 +277,7 @@ def find_Bragg_disks_selected(
     subpixel="multicorr",
     upsample_factor=16,
     filter_function=None,
-    show=True,
+    show=False,
     show_image=None,
     show_scale=200,
     show_power=0.25,

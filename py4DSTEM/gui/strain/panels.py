@@ -543,7 +543,7 @@ class BraggDiskTab(QtWidgets.QWidget):
 			# Set the diffraction space image
 			new_diffraction_space_view, success = self.main_window.datacube.get_diffraction_space_view(xc,yc)
 			if success:
-				braggviews.bragg_preview_DP_1.setImage(new_diffraction_space_view,
+				braggviews.bragg_preview_DP_1.setImage(new_diffraction_space_view**0.5,
 													   autoLevels=True,autoRange=False)
 				braggviews.bragg_preview_DP_1.getView().removeItem(self.scatter1)
 				braggviews.bragg_preview_DP_1.getView().addItem(newscatter1)
@@ -555,7 +555,7 @@ class BraggDiskTab(QtWidgets.QWidget):
 			# Set the diffraction space image
 			new_diffraction_space_view, success = self.main_window.datacube.get_diffraction_space_view(xc,yc)
 			if success:
-				braggviews.bragg_preview_DP_2.setImage(new_diffraction_space_view,
+				braggviews.bragg_preview_DP_2.setImage(new_diffraction_space_view**0.5,
 													   autoLevels=True,autoRange=False)
 				braggviews.bragg_preview_DP_2.getView().removeItem(self.scatter2)
 				braggviews.bragg_preview_DP_2.getView().addItem(newscatter2)
@@ -567,7 +567,7 @@ class BraggDiskTab(QtWidgets.QWidget):
 			# Set the diffraction space image
 			new_diffraction_space_view, success = self.main_window.datacube.get_diffraction_space_view(xc,yc)
 			if success:
-				braggviews.bragg_preview_DP_3.setImage(new_diffraction_space_view,
+				braggviews.bragg_preview_DP_3.setImage(new_diffraction_space_view**0.5,
 													   autoLevels=True,autoRange=False)
 				braggviews.bragg_preview_DP_3.getView().removeItem(self.scatter3)
 				braggviews.bragg_preview_DP_3.getView().addItem(newscatter3)
@@ -604,7 +604,7 @@ class BraggDiskTab(QtWidgets.QWidget):
 			relativeToPeak=settings.relative_to_peak_spinBox.value(),
 			minPeakSpacing=settings.min_peak_spacing_spinBox.value(),
 			maxNumPeaks=settings.max_num_peaks_spinBox.value(),
-			subpixel='none')
+			subpixel='none', show=False)
 
 		try:
 			spots1 = [{'pos': [peaks[0].data['qx'][i],peaks[0].data['qy'][i]], 'data':1} for i in range(peaks[0].length)]
