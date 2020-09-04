@@ -20,6 +20,7 @@ class KinematicLibrary:
         self,
         structure,
         max_index: int = 6,
+        q_max: float = 5,
         poles: Optional[np.ndarray] = None,
         voltage: float = 300_000,
         tol_zone: float = 0.1,
@@ -39,7 +40,9 @@ class KinematicLibrary:
                         structure (requires API key in config file, see:
                         https://pymatgen.org/usage.html#setting-the-pmg-mapi-key-in-the-config-file
 
-        max_index       maximum hkl indices to compute structure factors
+        max_index       (int) maximum hkl indices to compute structure factors
+
+        q_max           (float) maximum q-vector for library generation in Å^-1
 
         poles           numpy array (n,3) containing [h,k,l] indices for the n
                         orientations required in the simulation.
@@ -88,6 +91,7 @@ class KinematicLibrary:
         self.scat_fac = single_atom_scatter()
 
         self.max_index = max_index
+        self.q_max = q_max
         self.tol_zone = tol_zone
         self.tol_int = tol_int
         self.tol_shapefactor = tol_shapefactor
@@ -243,8 +247,7 @@ class KinematicLibrary:
         # make a separate datastructure to hold the complex structure factors
         hklF = np.zeros((len(hh.ravel()),), dtype=[("hkl", "3int"), ("F", "complex")])
 
-        # remove (0,0,0) **This is now handled down below
-        # hklI = hklI[~np.all(hklI == 0, axis=1)]
+        q_mask = np.zeros((len(hh.ravel()),), dtype=bool)
 
         # loop over reciprocal lattice points
         for i in tqdm(range(hklI.shape[0]), desc="computing structure factors"):
@@ -257,6 +260,8 @@ class KinematicLibrary:
                 if np.all(hkl == 0)
                 else np.array([1 / self.structure.lattice.d_hkl(hkl)])
             )
+
+            q_mask[i] = q < self.q_max
 
             Fhkl = np.zeros((1,), dtype=np.complex)
 
@@ -275,8 +280,8 @@ class KinematicLibrary:
             hklF["hkl"][i] = hkl
             hklF["F"][i] = Fhkl
 
-        self.hklI = hklI
-        self.hklF = hklF
+        self.hklI = hklI[q_mask, :]
+        self.hklF = hklF[q_mask]
 
     def _get_diffraction_intensities(self, uvw: np.ndarray, t: float) -> np.ndarray:
         # apply zone law to find reciprocal lattice points that may be excited
