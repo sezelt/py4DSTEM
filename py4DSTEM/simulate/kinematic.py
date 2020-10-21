@@ -1,5 +1,8 @@
 import numpy as np
-import pymatgen as mg
+try:
+        import pymatgen as mg
+except:
+        print("pymatgen not found... kinematic module won't work \_(ツ)_/¯")
 from tqdm import tqdm
 from typing import Optional
 
