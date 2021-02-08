@@ -20,7 +20,7 @@ import numpy as np
 try:
     import pymatgen as mg
 except Exception:
-    print(r"pymatgen not found... kinematic module won't work \_(ツ)_/¯")
+    print(r"pymatgen not found... kinematic module won't work ¯\\_(ツ)_/¯")
 
 from tqdm import tqdm
 from typing import Optional
@@ -34,7 +34,7 @@ from pdb import set_trace
 
 class KinematicLibrary:
     """
-    Kinematic performs kinematic (single scattering) diffraction simulations 
+    Perform kinematic (single scattering) diffraction simulations 
     to construct a library of simulated PointLists with associated orientations, used for classifying.
     """
 
