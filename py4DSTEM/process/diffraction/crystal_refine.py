@@ -3,6 +3,7 @@ from scipy import linalg
 from typing import Union, Optional
 from time import time
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from ...io.datastructure import PointList
 
@@ -59,26 +60,115 @@ def estimate_thickness(
     # which correspond to slices that pair up the common beams correctly
     matches = np.nonzero(np.all((hkl_bragg[a.ravel(),:] == hkl_bloch[b.ravel(),:]).reshape(a.shape + (3,)),axis=2))
     
+    # To penalize disks missing in the experiment, copy the Bloch beam list and, zero the intensities,
+    # and copy back the experimental ones where they were found
+    bragg_peaks_all = bloch_beams.copy()
+    bragg_peaks_all.data['intensity'] = 0.
+    bragg_peaks_all.data['intensity'][matches[1]] = bragg_peaks.data['intensity'][matches[0]]
+    
     # cost function: takes two structures arrays with (qx,qy,I,h,k,l) and returns a floating point number for the score
     def cost_function(bps, bbs):
-        return np.sum(  np.sqrt((bps['intensity'] - np.sqrt(bbs['intensity']))**2) * np.sqrt(bps['intensity']))
+        # return np.sum( (np.sqrt(bps['intensity']) - np.sqrt(bbs['intensity'])) )
+        # return np.sum( bps['intensity'] * bbs['intensity'] )
+        return np.sum( np.abs(bps['intensity'] - bbs['intensity']) )
         # return (np.sum( bps['intensity'] * bbs['intensity'] ) - 1) / (np.sum(bbs['intensity']) - 1)
         # return np.sum( bps['intensity'] * np.sqrt(bbs['intensity'] )) / (np.sum(np.sqrt(bbs['intensity'])))
     
-    scores = np.array([cost_function(bragg_peaks.data[matches[0]], bbs.data[matches[1]]) for bbs in bloch])
+    # scores = np.array([cost_function(bragg_peaks.data[matches[0]], bbs.data[matches[1]]) for bbs in bloch])
+    scores = np.array([cost_function(bragg_peaks_all.data, bbs.data) for bbs in bloch])
     
-    # if ax is not None:
-    #     ax[0].plot(thickness,scores)
-    #     bt = np.vstack([bb.data[matches[1]]['intensity'] for bb in bloch]).T
-    #     for b in bt:
-    #         ax[1].plot(thickness,np.sqrt(b))
-    #     for b,c in zip(bragg_peaks.data[matches[0]]['intensity'],plt.rcParams['axes.prop_cycle']):
-    #         ax[1].axhline(b,c=c['color'])
-    
+    if ax is not None:
+        ax[0].plot(thickness,scores)
+        bt = np.vstack([bb.data[matches[1]]['intensity'] for bb in bloch]).T
+        for b in bt:
+            ax[1].plot(thickness,np.sqrt(b))
+        for b,c in zip(bragg_peaks.data[matches[0]]['intensity'],plt.rcParams['axes.prop_cycle']):
+            ax[1].axhline(np.sqrt(b),c=c['color'])
     
     return thickness[np.nanargmin(scores)]
 
+def estimate_thickness_tilt(
+    self, 
+    bragg_peaks: PointList, 
+    orientation: np.ndarray, 
+    bloch_beams: PointList, 
+    thickness: np.ndarray,
+    min_peaks: int = 4,
+    tilt_refine_range = 18.,
+    tilt_refine_step_size_inv_A = 0.25,
+    ax=None,
+) -> float:
+    """
+    Estimate thickness of diffraction pattern encoded in ``bragg_peaks`` by computing
+    a thickness series of dynamical patters using ``bloch_beams`` and comparing
+    relative intensities.
 
+    Args:
+        bragg_peaks (PointList):        experimental measured disk intensities, with hkl indices
+        bloch_beams (PointList):        beams to include in the Bloch wave dynamical diffraction
+                                        calculation
+        thickness (ndarray):            Array of thickness values to compare against
+    """
+    
+    # get indices that match beams in bragg_peaks to beams in bloch_beams
+    hkl_bragg = np.vstack((bragg_peaks.data['h'],bragg_peaks.data['k'],bragg_peaks.data['l'])).T
+    hkl_bloch = np.vstack((bloch_beams.data['h'],bloch_beams.data['k'],bloch_beams.data['l'])).T
+    a,b = np.mgrid[0:hkl_bragg.shape[0],0:hkl_bloch.shape[0]]
+    # matches contains two arrays, one with the incdices into bragg_beams and one with indices into bloch_beams,
+    # which correspond to slices that pair up the common beams correctly
+    matches = np.nonzero(np.all((hkl_bragg[a.ravel(),:] == hkl_bloch[b.ravel(),:]).reshape(a.shape + (3,)),axis=2))
+    
+    if matches[0].shape[0] < min_peaks:
+        return 0.
+    
+    ZA = orientation[:,2] # this should be the ZA component of the orientation matrix ??
+    
+    bloch = self.generate_CBED(beams = bloch_beams,
+                               thickness = thickness,
+                               alpha_mrad = tilt_refine_range,
+                               pixel_size_inv_A = tilt_refine_step_size_inv_A,
+                               zone_axis = ZA,
+                               LACBED = True,
+                               verbose=False,
+                               progress_bar=False,
+                              )
+    
+    # normalize each Bloch wave pattern to the direct beam intensity
+    for ts in bloch: # loop over thicknesses
+        for b in ts.values(): # loop over LACBED disks
+            b /= ts[(0,0,0)]
+    
+    # To penalize disks missing in the experiment, copy the Bloch beam list and, zero the intensities,
+    # and copy back the experimental ones where they were found
+    bragg_peaks_all = bloch_beams.copy()
+    bragg_peaks_all.data['intensity'] = 0.
+    bragg_peaks_all.data['intensity'][matches[1]] = bragg_peaks.data['intensity'][matches[0]]
+    
+    # Generate an array like the flattened LACBED dict that has the experimental intensities in it
+    bragg_peaks_lacbed = np.zeros(bloch[0][(0,0,0)].shape + (len(bloch[0].keys()),))
+    bragg_peaks_lacbed[:,:,matches[1]] = bragg_peaks.data[matches[0]]['intensity']
+    
+    def cost_function(bps, bbs):
+        # return np.sum( (np.sqrt(bps['intensity']) - np.sqrt(bbs['intensity'])) )
+        # return np.sum( bps['intensity'] * bbs['intensity'] )
+        return np.sum( np.abs(bps - bbs), axis=2 )
+        # return (np.sum( bps['intensity'] * bbs['intensity'] ) - 1) / (np.sum(bbs['intensity']) - 1)
+        # return np.sum( bps['intensity'] * np.sqrt(bbs['intensity'] )) / (np.sum(np.sqrt(bbs['intensity'])))
+    
+    scores = np.array([cost_function(bragg_peaks_lacbed, np.dstack([arr for arr in bbs.values()])) for bbs in bloch])
+    # print(scores.shape)
+    
+    if ax is not None:
+        ax.plot(thickness,np.nanmin(scores,axis=(1,2)))
+    
+    # plotting
+    
+    idx = np.unravel_index(np.nanargmin(scores), scores.shape)
+    # print(idx, scores.shape)
+    
+    return thickness[idx[0]]
+
+from py4DSTEM.io import PointList
 def index_Bragg_peaks_from_orientation(
     self,
     bragg_peaks: PointList,
@@ -162,4 +252,7 @@ def index_Bragg_peaks_from_orientation(
                 )
             )
 
-    return PointList(match_dtype, np.squeeze(np.array(matches))), sim_peaks
+    if len(matches) > 0:
+        return PointList(match_dtype, np.squeeze(np.array(matches))), sim_peaks
+    else:
+        return PointList(match_dtype), sim_peaks
