@@ -342,13 +342,13 @@ def generate_dynamical_diffraction_pattern(
     # Compute the diagonal entries of \hat{A}: 2 k_0 s_g [5.51]
     g = np.linalg.inv(self.lat_real) @ hkl.T
     cos_alpha = np.sum(
-        (ZA[:, None] + g) * foil_normal[:, None], axis=0
+        (-ZA[:, None] + g) * foil_normal[:, None], axis=0
     ) / np.linalg.norm(ZA[:, None] + g, axis=0)
 
     sg = (
         (-0.5)
-        * np.sum((2 * ZA[:, None] + g) * g, axis=0)
-        / (np.linalg.norm(ZA[:, None] + g, axis=0))
+        * np.sum((2 * -ZA[:, None] + g) * g, axis=0)
+        / (np.linalg.norm(-ZA[:, None] + g, axis=0))
         / cos_alpha
     )
 
