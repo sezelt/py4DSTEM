@@ -419,7 +419,7 @@ def generate_CBED(
     zone_axis: Union[list, tuple, np.ndarray] = [0, 0, 1],
     foil_normal: Optional[Union[list, tuple, np.ndarray]] = None,
     LACBED: bool = False,
-    LACBED_selected_disks = None,
+    LACBED_selected_disks: Optional[list]=None,
     dtype: np.dtype = np.float32,
     verbose: bool = False,
     progress_bar: bool = True,
@@ -533,7 +533,9 @@ def generate_CBED(
             {
                 (d["h"], d["k"], d["l"]): np.zeros(DP_size, dtype=dtype)
                 for d in beams.data
-            } if LACBED_selected_disks is None else {
+            }
+            if LACBED_selected_disks is None
+            else {
                 (d[0], d[1], d[2]): np.zeros(DP_size, dtype=dtype)
                 for d in LACBED_selected_disks
             }
@@ -562,7 +564,10 @@ def generate_CBED(
             for patt, sim in zip(DP, bloch):
                 # loop over each beam
                 for refl in sim.data:
-                    if LACBED_selected_disks is None or (refl["h"], refl["k"], refl["l"]) in LACBED_selected_disks:
+                    if (
+                        LACBED_selected_disks is None
+                        or (refl["h"], refl["k"], refl["l"]) in LACBED_selected_disks
+                    ):
                         patt[(refl["h"], refl["k"], refl["l"])][
                             qx0 + tx_pixels[i], qy0 + ty_pixels[i]
                         ] = refl["intensity"]
