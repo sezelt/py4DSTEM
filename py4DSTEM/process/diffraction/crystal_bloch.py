@@ -419,6 +419,7 @@ def generate_CBED(
     zone_axis: Union[list, tuple, np.ndarray] = [0, 0, 1],
     foil_normal: Optional[Union[list, tuple, np.ndarray]] = None,
     LACBED: bool = False,
+    LACBED_selected_disks = None,
     dtype: np.dtype = np.float32,
     verbose: bool = False,
     progress_bar: bool = True,
@@ -446,6 +447,8 @@ def generate_CBED(
         foil_normal:                    3 element foil normal - set to None to use zone_axis
         LACBED (bool)                   Return each diffraction disk as a separate image, in a dictionary
                                         keyed by tuples of (h,k,l).
+        LACBED_selected_disks           Optional list of (h,k,l) tuples, indicating which dism images should
+                                        be saved in the LACBED data structure. If None, all disks are saved.
         proj_x_axis (np float vector):   3 element vector defining image x axis (vertical)
 
     Returns:
@@ -530,6 +533,9 @@ def generate_CBED(
             {
                 (d["h"], d["k"], d["l"]): np.zeros(DP_size, dtype=dtype)
                 for d in beams.data
+            } if LACBED_selected_disks is None else {
+                (d[0], d[1], d[2]): np.zeros(DP_size, dtype=dtype)
+                for d in LACBED_selected_disks
             }
             for _ in range(len(thickness))
         ]
@@ -556,9 +562,10 @@ def generate_CBED(
             for patt, sim in zip(DP, bloch):
                 # loop over each beam
                 for refl in sim.data:
-                    patt[(refl["h"], refl["k"], refl["l"])][
-                        qx0 + tx_pixels[i], qy0 + ty_pixels[i]
-                    ] = refl["intensity"]
+                    if LACBED_selected_disks is None or (refl["h"], refl["k"], refl["l"]) in LACBED_selected_disks:
+                        patt[(refl["h"], refl["k"], refl["l"])][
+                            qx0 + tx_pixels[i], qy0 + ty_pixels[i]
+                        ] = refl["intensity"]
         else:
             xpix = np.round(
                 bloch[0].data["qx"] / pixel_size_inv_A + tx_pixels[i] + qx0
