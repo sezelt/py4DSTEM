@@ -424,6 +424,7 @@ def generate_CBED(
     verbose: bool = False,
     progress_bar: bool = True,
     return_mask: bool = False,
+    return_ZA: bool = False,
 ) -> Union[np.ndarray, List[np.ndarray], Dict[Tuple[int], np.ndarray]]:
     """
     Generate a dynamical CBED pattern using the Bloch wave method.
@@ -591,7 +592,13 @@ def generate_CBED(
             for patt, sim in zip(DP, bloch):
                 patt[xpix, ypix] += sim.data["intensity"][keep_mask]
 
+    ret = [DP[0] if len(thickness) == 1 else DP,]
     if return_mask:
-        return (DP[0], mask) if len(thickness) == 1 else (DP, mask)
-    else:
-        return DP[0] if len(thickness) == 1 else DP
+        ret.append(mask)
+    if return_ZA:
+        ZA_img = np.zeros(keep_mask.shape + (3,))
+        ZA_img[keep_mask,:] = tZA
+        ret.append(ZA_img)
+
+    return ret[0] if len(ret) == 1 else ret
+
