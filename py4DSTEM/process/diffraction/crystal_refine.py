@@ -16,6 +16,7 @@ def estimate_thickness(
     bloch_beams: PointList,
     thickness: np.ndarray,
     min_peaks: int = 4,
+    normalize_to_direct_beam: bool=True,
     ax=None,
 ) -> float:
     """
@@ -40,7 +41,7 @@ def estimate_thickness(
     bloch = self.generate_dynamical_diffraction_pattern(
         bloch_beams,
         thickness=thickness,
-        zone_axis=ZA,
+        zone_axis_cartesian=ZA,
         always_return_list=True,
     )
 
@@ -55,8 +56,9 @@ def estimate_thickness(
             )
         )
     )[0][0]
-    for b in bloch:
-        b.data["intensity"] /= b.data["intensity"][idx]
+    if normalize_to_direct_beam:
+        for b in bloch:
+            b.data["intensity"] /= b.data["intensity"][idx]
 
     # get indices that match beams in bragg_peaks to beams in bloch_beams
     hkl_bragg = np.vstack(
