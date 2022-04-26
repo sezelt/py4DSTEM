@@ -327,13 +327,6 @@ def _find_Bragg_disks_single_DP_FK_CUDA(
     Returns:
         peaks                (PointList) the Bragg peak positions and correlation intensities
     """
-    assert subpixel in [
-        "none",
-        "poly",
-        "multicorr",
-    ], "Unrecognized subpixel option {}, subpixel must be 'none', 'poly', or 'multicorr'".format(
-        subpixel
-    )
 
     # if we are in batching mode, cc and ccc will be provided. else, compute it
     if ccc is None:
@@ -375,8 +368,6 @@ def _find_Bragg_disks_single_DP_FK_CUDA(
     if peaks is None:
         coords = [("qx", float), ("qy", float), ("intensity", float)]
         peaks = PointList(coordinates=coords)
-    else:
-        assert isinstance(peaks, PointList)
     peaks.add_tuple_of_nparrays((maxima_x, maxima_y, maxima_int))
 
     if return_cc:
@@ -399,7 +390,6 @@ def get_cross_correlation_fk(ar, fourierkernel, corrPower=1, returnval="cc"):
         if return=='fourier', returns the output in Fourier space, before taking the
         inverse transform.
     """
-    assert returnval in ("cc", "fourier")
     m = cp.fft.fft2(ar) * fourierkernel
     ccc = cp.abs(m) ** (corrPower) * cp.exp(1j * cp.angle(m))
     if returnval == "fourier":
@@ -455,13 +445,6 @@ def get_maxima_2D(
         maxima_y                (ndarray) y-coords of the local maximum, sorted by intensity.
         maxima_intensity        (ndarray) intensity of the local maxima
     """
-    assert subpixel in [
-        "none",
-        "poly",
-        "multicorr",
-    ], "Unrecognized subpixel option {}, subpixel must be 'none', 'poly', or 'multicorr'".format(
-        subpixel
-    )
 
     # Get maxima
     ar = gaussian_filter(ar, sigma)
@@ -473,7 +456,6 @@ def get_maxima_2D(
 
     # Remove edges
     if edgeBoundary > 0:
-        assert isinstance(edgeBoundary, (int, np.integer))
         maxima_bool[:edgeBoundary, :] = False
         maxima_bool[-edgeBoundary:, :] = False
         maxima_bool[:, :edgeBoundary] = False
@@ -513,7 +495,6 @@ def get_maxima_2D(
 
         # Remove maxima which are too dim
         if (minRelativeIntensity > 0) & (len(maxima) > relativeToPeak):
-            assert isinstance(relativeToPeak, (int, np.integer))
             deletemask = (
                 maxima["intensity"] / maxima["intensity"][relativeToPeak]
                 < minRelativeIntensity
@@ -527,7 +508,6 @@ def get_maxima_2D(
 
         # Remove maxima in excess of maxNumPeaks
         if maxNumPeaks is not None and maxNumPeaks > 0:
-            assert isinstance(maxNumPeaks, (int, np.integer))
             if len(maxima) > maxNumPeaks:
                 maxima = maxima[:maxNumPeaks]
 
@@ -613,8 +593,6 @@ def upsampled_correlation(imageCorr, upsampleFactor, xyShift):
     Returns:
         (2-element np array): Refined location of the peak in image coordinates.
     """
-
-    assert upsampleFactor > 2
 
     xyShift[0] = np.round(xyShift[0] * upsampleFactor) / upsampleFactor
     xyShift[1] = np.round(xyShift[1] * upsampleFactor) / upsampleFactor

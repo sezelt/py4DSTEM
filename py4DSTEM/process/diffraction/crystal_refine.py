@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import linalg
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Tuple
 from time import time
 from tqdm import tqdm
 from ..utils import tqdmnd
@@ -123,6 +123,7 @@ def estimate_thickness_tilt(
     normalize_to_direct_beam=True,
     return_best_match_pointlist=True,
     ax=None,
+    verbose=False,
 ) -> float:
     """
     Estimate thickness of diffraction pattern encoded in ``bragg_peaks`` by computing
@@ -170,7 +171,7 @@ def estimate_thickness_tilt(
         zone_axis_cartesian=ZA,
         LACBED=True,
         verbose=False,
-        progress_bar=False,
+        progress_bar=verbose,
         return_ZA=True,
     )
 
@@ -193,12 +194,8 @@ def estimate_thickness_tilt(
     bragg_peaks_lacbed[:, :, matches[1]] = bragg_peaks.data[matches[0]]["intensity"]
 
     def cost_function(bps, bbs):
-        # return np.sum( (np.sqrt(bps['intensity']) - np.sqrt(bbs['intensity'])) )
-        # return np.sum( bps['intensity'] * bbs['intensity'] )
-        # return np.sum( np.abs(bps - bbs), axis=2 )
+        # return np.sum( bps * bbs, axis=2)
         return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
-        # return (np.sum( bps['intensity'] * bbs['intensity'] ) - 1) / (np.sum(bbs['intensity']) - 1)
-        # return np.sum( bps['intensity'] * np.sqrt(bbs['intensity'] )) / (np.sum(np.sqrt(bbs['intensity'])))
 
     scores = np.array(
         [
@@ -206,7 +203,8 @@ def estimate_thickness_tilt(
             for bbs in bloch
         ]
     )
-    print(scores.shape)
+    if verbose:
+        print(scores.shape)
 
     if ax is not None:
         ax.plot(thickness, np.nanmin(scores, axis=(1, 2)))
