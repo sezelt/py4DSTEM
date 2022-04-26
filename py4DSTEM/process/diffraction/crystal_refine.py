@@ -194,12 +194,8 @@ def estimate_thickness_tilt(
     bragg_peaks_lacbed[:, :, matches[1]] = bragg_peaks.data[matches[0]]["intensity"]
 
     def cost_function(bps, bbs):
-        # return np.sum( (np.sqrt(bps['intensity']) - np.sqrt(bbs['intensity'])) )
-        # return np.sum( bps['intensity'] * bbs['intensity'] )
-        # return np.sum( np.abs(bps - bbs), axis=2 )
+        # return np.sum( bps * bbs, axis=2)
         return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
-        # return (np.sum( bps['intensity'] * bbs['intensity'] ) - 1) / (np.sum(bbs['intensity']) - 1)
-        # return np.sum( bps['intensity'] * np.sqrt(bbs['intensity'] )) / (np.sum(np.sqrt(bbs['intensity'])))
 
     scores = np.array(
         [
