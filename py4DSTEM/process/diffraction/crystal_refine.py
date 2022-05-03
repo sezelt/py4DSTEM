@@ -164,7 +164,7 @@ def estimate_thickness_tilt(
         :, 2
     ]  # this should be the ZA component of the orientation matrix ??
 
-    bloch, CBED_ZA = self.generate_CBED(
+    bloch, mask, CBED_ZA = self.generate_CBED(
         beams=bloch_beams,
         thickness=thickness,
         alpha_mrad=tilt_refine_range,
@@ -174,6 +174,7 @@ def estimate_thickness_tilt(
         verbose=False,
         progress_bar=verbose,
         return_ZA=True,
+        return_mask=True,
     )
 
     # normalize each Bloch wave pattern to the direct beam intensity
@@ -201,16 +202,17 @@ def estimate_thickness_tilt(
         # print(bps.round(2))
         # print(bbs.round(2))
         # return np.sum( bps * bbs, axis=2)
-        return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
+        # return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
+        return np.sum(np.abs(np.sqrt(np.maximum(bps,0)) - np.sqrt(bbs)),axis=2)
         # return -np.sum( bps*bbs,axis=2) / np.sqrt(np.sum(bps**2,axis=2)) / np.sqrt(np.sum(bbs**2,axis=2))
         # return -np.sum( (bps-np.mean(bps))*(bbs-np.mean(bbs)),axis=2) / np.sqrt(np.sum((bps-np.mean(bps))**2,axis=2)) / np.sqrt(np.sum((bbs-np.mean(bbs))**2,axis=2))
 
 
-    scores = np.array(
+    scores = np.ma.array(
         [
             cost_function(bragg_peaks_lacbed, np.dstack([arr for arr in bbs.values()]))
             for bbs in bloch
-        ]
+        ], mask=~np.tile(mask,(thickness.shape[0],1,1))
     )
     if verbose:
         print(scores.shape)

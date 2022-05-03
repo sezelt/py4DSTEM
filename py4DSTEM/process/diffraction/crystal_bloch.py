@@ -584,6 +584,7 @@ def generate_CBED(
                         patt[(refl["h"], refl["k"], refl["l"])][
                             qx0 + tx_pixels[i], qy0 + ty_pixels[i]
                         ] = refl["intensity"]
+                mask[qx0 + tx_pixels[i], qy0 + ty_pixels[i]] = True
         else:
             xpix = np.round(
                 bloch[0].data["qx"] / pixel_size_inv_A + tx_pixels[i] + qx0
