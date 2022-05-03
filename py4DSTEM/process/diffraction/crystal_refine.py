@@ -195,31 +195,25 @@ def estimate_thickness_tilt(
     bragg_peaks_lacbed = np.zeros(bloch[0][(0, 0, 0)].shape + (len(bloch[0].keys()),))
     bragg_peaks_lacbed[:, :, matches[1]] = bragg_peaks.data[matches[0]]["intensity"]
 
-    # print(bragg_peaks_all.data[matches[1]])
-    # print(bloch_beams.data[matches[0]])
-
     def cost_function(bps, bbs):
-        # print(bps.round(2))
-        # print(bbs.round(2))
         # return np.sum( bps * bbs, axis=2)
         # return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
-        return np.sum(np.abs(np.sqrt(np.maximum(bps,0)) - np.sqrt(bbs)),axis=2)
+        return np.sum(np.abs(np.sqrt(np.maximum(bps, 0)) - np.sqrt(bbs)), axis=2)
         # return -np.sum( bps*bbs,axis=2) / np.sqrt(np.sum(bps**2,axis=2)) / np.sqrt(np.sum(bbs**2,axis=2))
         # return -np.sum( (bps-np.mean(bps))*(bbs-np.mean(bbs)),axis=2) / np.sqrt(np.sum((bps-np.mean(bps))**2,axis=2)) / np.sqrt(np.sum((bbs-np.mean(bbs))**2,axis=2))
-
 
     scores = np.ma.array(
         [
             cost_function(bragg_peaks_lacbed, np.dstack([arr for arr in bbs.values()]))
             for bbs in bloch
-        ], mask=~np.tile(mask,(thickness.shape[0],1,1))
+        ],
+        mask=~np.tile(mask, (thickness.shape[0], 1, 1)),
     )
     if verbose:
         print(scores.shape)
 
     idx = np.unravel_index(np.nanargmin(scores), scores.shape)
     tZA = CBED_ZA[idx[1:3]]
-    # print(idx, scores.shape)
 
     ret = [thickness[idx[0]], tZA]
     if return_best_match_pointlist:
@@ -237,69 +231,79 @@ def estimate_thickness_tilt(
     if ax is not None:
         if isinstance(ax, np.ndarray):
             ax[0].plot(thickness, np.nanmin(scores, axis=(1, 2)))
-            ax[1].matshow(np.nanmin(scores,axis=0),cmap='turbo')
-            ax[1].scatter(idx[2],idx[1])
+            ax[1].matshow(np.nanmin(scores, axis=0), cmap="turbo")
+            ax[1].scatter(idx[2], idx[1])
         else:
             ax.plot(thickness, np.nanmin(scores, axis=(1, 2)))
 
     return ret
 
+
 #####################
 # UTILITY FUNCTIONS #
 #####################
 
-def generate_Bloch_beams(self,
-    bragg_peaks:PointList,
+
+def generate_Bloch_beams(
+    self,
+    bragg_peaks: PointList,
     orientation_matrices,
     tol_distance=0.08,
     sigma_excitation_error=0.06,
     tol_excitation_error_mult=2,
     tol_intensity=0.001,
     k_max=1.5,
-    unscattered_beam_intensity:Optional[float]=None,
-) -> Tuple[PointList,PointList]:
+    unscattered_beam_intensity: Optional[float] = None,
+) -> Tuple[PointList, PointList]:
     """
     Generate the inputs for thickness refinement. Returns two PointListArrays,
-    containing (i) the experimental bragg_peaks with crystallographic indexing applied, and 
+    containing (i) the experimental bragg_peaks with crystallographic indexing applied, and
     (ii) the beams to include in a Bloch wave calculation for the orientation give by the input
     orientation_matrices. Other arguments are passed to index_Bragg_peaks_from_orientation.
     If unscattered_beam_intensity is None, each indexed experimental PointList is normalized to the
     intensity of the local 0,0,0 beam. If the intensity of the vacuum beam is specified as a float,
-    each reflection intensity is instead divided by this value. 
+    each reflection intensity is instead divided by this value.
     """
     bps_indexed = bragg_peaks.copy()
     bloch_beams = bragg_peaks.copy()
 
     # unscattered_beam_intensity = None
 
-
-    for rx,ry in py4DSTEM.process.utils.tqdmnd(bragg_peaks.shape[0],bragg_peaks.shape[1]):
-        idx_peaks,sim_peaks = xtal.index_Bragg_peaks_from_orientation(
-                                                                bragg_peaks=bps_indexed.pointlists[rx][ry],
-                                                                orientation=orientation_matrices[rx,ry],
-                                                                tol_distance=0.08,
-                                                                sigma_excitation_error=0.06,
-                                                                tol_excitation_error_mult=2,
-                                                                tol_intensity=0.001,
-                                                                k_max=1.5)
+    for rx, ry in py4DSTEM.process.utils.tqdmnd(
+        bragg_peaks.shape[0], bragg_peaks.shape[1]
+    ):
+        idx_peaks, sim_peaks = xtal.index_Bragg_peaks_from_orientation(
+            bragg_peaks=bps_indexed.pointlists[rx][ry],
+            orientation=orientation_matrices[rx, ry],
+            tol_distance=0.08,
+            sigma_excitation_error=0.06,
+            tol_excitation_error_mult=2,
+            tol_intensity=0.001,
+            k_max=1.5,
+        )
         bps_indexed.pointlists[rx][ry] = idx_peaks
         bloch_beams.pointlists[rx][ry] = sim_peaks
-        
+
         pld = bps_indexed.pointlists[rx][ry].data
         if unscattered_beam_intensity is None:
             # normalize to local direct beam
             zerobeam = [0, 0, 0]
             idx = np.argwhere(
-                np.atleast_1d(np.logical_and(
-                    np.logical_and(pld["h"] == zerobeam[0], pld["k"] == zerobeam[1]),
-                    pld["l"] == zerobeam[2],
-                ))
+                np.atleast_1d(
+                    np.logical_and(
+                        np.logical_and(
+                            pld["h"] == zerobeam[0], pld["k"] == zerobeam[1]
+                        ),
+                        pld["l"] == zerobeam[2],
+                    )
+                )
             )[0][0]
-            pld['intensity'] /= np.atleast_1d(pld['intensity'])[idx]
+            pld["intensity"] /= np.atleast_1d(pld["intensity"])[idx]
         else:
-            pld['intensity'] /= unscattered_beam_intensity
+            pld["intensity"] /= unscattered_beam_intensity
 
         return bps_indexed, bloch_beams
+
 
 def index_Bragg_peaks_from_orientation(
     self,
