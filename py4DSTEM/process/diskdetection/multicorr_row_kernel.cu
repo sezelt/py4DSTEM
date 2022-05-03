@@ -30,16 +30,23 @@ void multicorr_row_kernel(
 	// Which column in the kernel (last index of ar)
 	int col_idx = (tid - (kernel_size*image_size_x)*kernel_idx - image_size_x*row_idx) % image_size_x;
 
-	complex<float> prefactor = complex<float>(2.0 * PI,-1.0) / (image_size_y * upsample_factor);
+	complex<float> prefactor = complex<float>(0,-2.0 * PI) / float(image_size_x * upsample_factor);
 
 	// Now do the actual calculation
 	if (tid < N_pts * image_size_y * kernel_size) {
-		float columnEntry = 0. ; //TODO
+		// np.arange(numColumns) - xyShift[idx,0]
+		float columnEntry = (float)row_idx - xyShifts[kernel_idx*2];
 
-		// np.arange(numColumns) - xyShift[idx,1]
-		float rowEntry = (float) col_idx - xyShifts[kernel_idx*2 + 1];
+		// np.fft.ifftshift(np.arange(imageSize[0])) - np.floor(imageSize[0]/2)
+		float rowEntry = float(int(col_idx - ceil((float)image_size_x / 2.)) % image_size_x) - floor((float)image_size_x/2.) ; 
 
-		ar[tid] = exp(prefactor * columnEntry * rowEntry); // Do I have to cast these explicitly?
+		ar[tid] = exp(prefactor * columnEntry * rowEntry);
+
+		// Use these for testing the indexing:
+		//ar[tid] = complex<float>(0,(float)tid);
+		//ar[tid] = complex<float>(0,(float)kernel_idx);
+		//ar[tid] = complex<float>(0,(float)row_idx);
+		//ar[tid] = complex<float>(0,(float)col_idx);
 	}
 
 }
