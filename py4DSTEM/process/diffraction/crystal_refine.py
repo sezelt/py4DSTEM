@@ -122,6 +122,7 @@ def estimate_thickness_tilt(
     tilt_refine_step_size_inv_A=0.25,
     normalize_to_direct_beam=True,
     return_best_match_pointlist=True,
+    return_scores=False,
     ax=None,
     verbose=False,
 ) -> float:
@@ -193,9 +194,17 @@ def estimate_thickness_tilt(
     bragg_peaks_lacbed = np.zeros(bloch[0][(0, 0, 0)].shape + (len(bloch[0].keys()),))
     bragg_peaks_lacbed[:, :, matches[1]] = bragg_peaks.data[matches[0]]["intensity"]
 
+    # print(bragg_peaks_all.data[matches[1]])
+    # print(bloch_beams.data[matches[0]])
+
     def cost_function(bps, bbs):
+        # print(bps.round(2))
+        # print(bbs.round(2))
         # return np.sum( bps * bbs, axis=2)
         return np.sum(np.abs(np.maximum(bps, 0) - bbs), axis=2)
+        # return -np.sum( bps*bbs,axis=2) / np.sqrt(np.sum(bps**2,axis=2)) / np.sqrt(np.sum(bbs**2,axis=2))
+        # return -np.sum( (bps-np.mean(bps))*(bbs-np.mean(bbs)),axis=2) / np.sqrt(np.sum((bps-np.mean(bps))**2,axis=2)) / np.sqrt(np.sum((bbs-np.mean(bbs))**2,axis=2))
+
 
     scores = np.array(
         [
@@ -206,23 +215,32 @@ def estimate_thickness_tilt(
     if verbose:
         print(scores.shape)
 
-    if ax is not None:
-        ax.plot(thickness, np.nanmin(scores, axis=(1, 2)))
-
-    # plotting
-
     idx = np.unravel_index(np.nanargmin(scores), scores.shape)
     tZA = CBED_ZA[idx[1:3]]
     # print(idx, scores.shape)
+
+    ret = [thickness[idx[0]], tZA]
     if return_best_match_pointlist:
         pl_return = bloch_beams.copy()
         for beam in pl_return.data:
             beam["intensity"] = bloch[idx[0]][(beam["h"], beam["k"], beam["l"])][
                 idx[1:3]
             ]
-        return thickness[idx[0]], tZA, pl_return
+        ret.append(pl_return)
 
-    return thickness[idx[0]], tZA
+    if return_scores:
+        ret.append(scores)
+
+    # Plotting
+    if ax is not None:
+        if isinstance(ax, np.ndarray):
+            ax[0].plot(thickness, np.nanmin(scores, axis=(1, 2)))
+            ax[1].matshow(np.nanmin(scores,axis=0),cmap='turbo')
+            ax[1].scatter(idx[2],idx[1])
+        else:
+            ax.plot(thickness, np.nanmin(scores, axis=(1, 2)))
+
+    return ret
 
 #####################
 # UTILITY FUNCTIONS #
