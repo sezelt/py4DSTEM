@@ -38,7 +38,10 @@ void multicorr_row_kernel(
 		float columnEntry = (float)row_idx - xyShifts[kernel_idx*2];
 
 		// np.fft.ifftshift(np.arange(imageSize[0])) - np.floor(imageSize[0]/2)
-		float rowEntry = float(int(col_idx - ceil((float)image_size_x / 2.)) % image_size_x) - floor((float)image_size_x/2.) ; 
+		// modresult is necessary to get the Pythonic behavior of mod of negative numbers
+		int modresult = int(col_idx - ceil((float)image_size_x / 2.)) % image_size_x;
+		modresult = modresult < 0 ? modresult + image_size_x : modresult;
+		float rowEntry = float(modresult) - floor((float)image_size_x/2.) ; 
 
 		ar[tid] = exp(prefactor * columnEntry * rowEntry);
 
