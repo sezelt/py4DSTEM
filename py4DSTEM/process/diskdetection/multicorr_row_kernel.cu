@@ -10,15 +10,15 @@ void multicorr_row_kernel(
 	const long long upsample_factor) {
 	/*
 	Fill in the entries of the multicorr row kernel.
-	Inputs:
-		ar (complex<float>* / np.complex64):	Array of size N_pts x kernel_width * image_size[0]
+	Inputs (C++ type/Python type):
+		ar (complex<float>* / cp.complex64):	Array of size N_pts x kernel_width * image_size[0]
 				to hold the row kernels
-		xyShifts (const float* / np.float32): (N_pts x 2) array of center points to build kernels for
-		N_pts (const long long/Python int) number of center points we are
+		xyShifts (const float* / cp.float32): (N_pts x 2) array of center points to build kernels for
+		N_pts (const long long/int) number of center points we are
 				building kernels for
-		image_size_x (const long long/Python int): x size of the correlation image
-		image_size_y (const long long/Python int): y size of correlation image
-		upsample_factor (const long long/Python int): note, kernel_width = ceil(1.5*upsample_factor)
+		image_size_x (const long long/int): x size of the correlation image
+		image_size_y (const long long/int): y size of correlation image
+		upsample_factor (const long long/int): note, kernel_width = ceil(1.5*upsample_factor)
 	*/
 	int kernel_size = ceil(1.5 * upsample_factor);
 
@@ -33,7 +33,7 @@ void multicorr_row_kernel(
 	complex<float> prefactor = complex<float>(0,-2.0 * PI) / float(image_size_x * upsample_factor);
 
 	// Now do the actual calculation
-	if (tid < N_pts * image_size_y * kernel_size) {
+	if (tid < N_pts * image_size_x * kernel_size) {
 		// np.arange(numColumns) - xyShift[idx,0]
 		float columnEntry = (float)row_idx - xyShifts[kernel_idx*2];
 
