@@ -1,7 +1,7 @@
 #include <cupy/complex.cuh>
 #define PI 3.14159265359
 extern "C" __global__
-void multicorr_row_kernel(
+void multicorr_col_kernel(
 	complex<float> *ar,
 	const float *xyShifts,
 	const long long N_pts,
@@ -11,7 +11,7 @@ void multicorr_row_kernel(
 	/*
 	Fill in the entries of the multicorr row kernel.
 	Inputs (C++ type/Python type):
-		ar (complex<float>* / cp.complex64):	Array of size N_pts x kernel_size x image_size[0]
+		ar (complex<float>* / cp.complex64):	Array of size N_pts x image_size[1] x kernel_size
 				to hold the row kernels
 		xyShifts (const float* / cp.float32): (N_pts x 2) array of center points to build kernels for
 		N_pts (const long long/int) number of center points we are
@@ -24,24 +24,25 @@ void multicorr_row_kernel(
 
 	int tid = blockDim.x * blockIdx.x + threadIdx.x;
 	// Which kernel in the stack (first index of ar)
-	int kernel_idx = tid / (kernel_size * image_size_x);
+	int kernel_idx = tid / (kernel_size * image_size_y);
 	// Which row in the kernel (second index of ar)
-	int row_idx = (tid - (kernel_size*image_size_x)*kernel_idx) / image_size_x;
+	int row_idx = (tid - (kernel_size*image_size_y)*kernel_idx) / kernel_size;
 	// Which column in the kernel (last index of ar)
-	int col_idx = (tid - (kernel_size*image_size_x)*kernel_idx - image_size_x*row_idx) % image_size_x;
+	int col_idx = (tid - (kernel_size*image_size_y)*kernel_idx - kernel_size*row_idx) % kernel_size;
 
-	complex<float> prefactor = complex<float>(0,-2.0 * PI) / float(image_size_x * upsample_factor);
+	complex<float> prefactor = complex<float>(0,-2.0 * PI) / float(image_size_y * upsample_factor);
 
 	// Now do the actual calculation
-	if (tid < N_pts * image_size_x * kernel_size) {
-		// np.arange(numColumns) - xyShift[idx,0]
-		float columnEntry = (float)row_idx - xyShifts[kernel_idx*2];
-
-		// np.fft.ifftshift(np.arange(imageSize[0])) - np.floor(imageSize[0]/2)
+	if (tid < N_pts * image_size_y * kernel_size) {
+		// np.fft.ifftshift(np.arange(imageSize[1])) - np.floor(imageSize[1]/2)
 		// modresult is necessary to get the Pythonic behavior of mod of negative numbers
-		int modresult = int(col_idx - ceil((float)image_size_x / 2.)) % image_size_x;
-		modresult = modresult < 0 ? modresult + image_size_x : modresult;
-		float rowEntry = float(modresult) - floor((float)image_size_x/2.) ; 
+		int modresult = int(col_idx - ceil((float)image_size_y / 2.)) % image_size_y;
+		modresult = modresult < 0 ? modresult + image_size_y : modresult;
+		float columnEntry = float(modresult) - floor((float)image_size_y/2.) ; 
+
+
+		// np.arange(numColumns) - xyShift[idx,0]
+		float rowEntry = (float)col_idx - xyShifts[kernel_idx*2 + 1];
 
 		ar[tid] = exp(prefactor * columnEntry * rowEntry);
 

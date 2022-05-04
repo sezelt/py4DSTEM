@@ -116,14 +116,14 @@ def calculate_dynamical_structure_factors(
 
     lobato_lookup = single_atom_scatter()
 
-    m0c2 = 5.109989461e5    # electron rest mass, in eV
-    relativistic_factor = (m0c2 + accelerating_voltage)/m0c2
+    m0c2 = 5.109989461e5  # electron rest mass, in eV
+    relativistic_factor = (m0c2 + accelerating_voltage) / m0c2
 
     from functools import lru_cache
 
     # get_f_e returns f^e in units of VÅ^3, with relativistic correction
-    # but not yet converted to 
-    @lru_cache(maxsize=2 ** 12)
+    # but not yet converted to
+    @lru_cache(maxsize=2**12)
     def get_f_e(q, Z, B, method):
         if method == "Lobato":
             # Real lobato factors
@@ -132,7 +132,9 @@ def calculate_dynamical_structure_factors(
         elif method == "Lobato-absorptive":
             # Fake absorptive Lobato factors
             lobato_lookup.get_scattering_factor([Z], [1.0], [q], units="A")
-            return np.complex128(relativistic_factor / np.pi * lobato_lookup.fe * (1.0 + 0.1j))
+            return np.complex128(
+                relativistic_factor / np.pi * lobato_lookup.fe * (1.0 + 0.1j)
+            )
         elif method == "WK":
             # Real WK factor
             return compute_WK_factor(
@@ -291,15 +293,18 @@ def generate_dynamical_diffraction_pattern(
     beam_g, beam_h = np.meshgrid(np.arange(n_beams), np.arange(n_beams))
 
     # Parse input orientations:
-    zone_axis_rotation_matrix = self.parse_orientation(zone_axis_lattice=zone_axis_lattice, 
-                                       zone_axis_cartesian=zone_axis_cartesian)
+    zone_axis_rotation_matrix = self.parse_orientation(
+        zone_axis_lattice=zone_axis_lattice, zone_axis_cartesian=zone_axis_cartesian
+    )
     if foil_normal_lattice is not None or foil_normal_cartesian is not None:
-        foil_normal = self.parse_orientation(zone_axis_lattice=foil_normal_lattice,
-                                             zone_axis_cartesian=foil_normal_cartesian)
+        foil_normal = self.parse_orientation(
+            zone_axis_lattice=foil_normal_lattice,
+            zone_axis_cartesian=foil_normal_cartesian,
+        )
     else:
         foil_normal = zone_axis_rotation_matrix
 
-    foil_normal = foil_normal[:,2]
+    foil_normal = foil_normal[:, 2]
 
     # Note the difference in notation versus kinematic function:
     # k0 is the scalar magnitude of the wavevector, rather than
@@ -350,7 +355,9 @@ def generate_dynamical_diffraction_pattern(
 
     # Compute the diagonal entries of \hat{A}: 2 k_0 s_g [5.51]
     g = (hkl @ self.lat_inv) @ zone_axis_rotation_matrix
-    sg = self.excitation_errors(g.T, foil_normal=-foil_normal @ zone_axis_rotation_matrix)
+    sg = self.excitation_errors(
+        g.T, foil_normal=-foil_normal @ zone_axis_rotation_matrix
+    )
 
     # import matplotlib.pyplot as plt
     # sgp = np.sign(sg) >= 0
@@ -361,7 +368,6 @@ def generate_dynamical_diffraction_pattern(
     # ax.scatter(g[:,0],g[:,1],np.abs(sg)*100,c=c)
     # ax.axis('equal')
     # plt.show()
-
 
     # Fill in the diagonal, completing the structure mattrx
     np.fill_diagonal(U_gmh, 2 * k0 * sg + 1.0j * np.imag(self.Ug_dict[(0, 0, 0)]))
@@ -377,7 +383,9 @@ def generate_dynamical_diffraction_pattern(
     t0 = time()  # start timer for eigendecomposition
 
     v, C = linalg.eig(U_gmh)  # decompose!
-    gamma = v / (2.0 * k0 * zone_axis_rotation_matrix[:,2] @ foil_normal)  # divide by 2 k_n
+    gamma = v / (
+        2.0 * k0 * zone_axis_rotation_matrix[:, 2] @ foil_normal
+    )  # divide by 2 k_n
 
     # precompute the inverse of C
     C_inv = np.linalg.inv(C)
@@ -430,7 +438,7 @@ def generate_CBED(
     foil_normal_lattice: np.ndarray = None,
     foil_normal_cartesian: np.ndarray = None,
     LACBED: bool = False,
-    LACBED_selected_disks: Optional[list]=None,
+    LACBED_selected_disks: Optional[list] = None,
     dtype: np.dtype = np.float32,
     verbose: bool = False,
     progress_bar: bool = True,
@@ -483,12 +491,20 @@ def generate_CBED(
     hkl_proj_y = proj[1] / np.linalg.norm(proj[1])
 
     # get unit vector in zone axis direction and projected x and y Cartesian directions:
-    zone_axis_rotation_matrix = self.parse_orientation(zone_axis_lattice=zone_axis_lattice,
-                                       zone_axis_cartesian=zone_axis_cartesian,
-                                       proj_x_lattice=hkl_proj_x)
-    ZA = np.array(zone_axis_rotation_matrix[:,2]) / np.linalg.norm(np.array(zone_axis_rotation_matrix[:,2]))
-    proj_x = zone_axis_rotation_matrix[:,0] / np.linalg.norm(zone_axis_rotation_matrix[:,0])
-    proj_y = zone_axis_rotation_matrix[:,1] / np.linalg.norm(zone_axis_rotation_matrix[:,1])
+    zone_axis_rotation_matrix = self.parse_orientation(
+        zone_axis_lattice=zone_axis_lattice,
+        zone_axis_cartesian=zone_axis_cartesian,
+        proj_x_lattice=hkl_proj_x,
+    )
+    ZA = np.array(zone_axis_rotation_matrix[:, 2]) / np.linalg.norm(
+        np.array(zone_axis_rotation_matrix[:, 2])
+    )
+    proj_x = zone_axis_rotation_matrix[:, 0] / np.linalg.norm(
+        zone_axis_rotation_matrix[:, 0]
+    )
+    proj_y = zone_axis_rotation_matrix[:, 1] / np.linalg.norm(
+        zone_axis_rotation_matrix[:, 1]
+    )
 
     # the foil normal should be the zone axis if unspecified
     if foil_normal_lattice is None:
@@ -593,6 +609,7 @@ def generate_CBED(
                         patt[(refl["h"], refl["k"], refl["l"])][
                             qx0 + tx_pixels[i], qy0 + ty_pixels[i]
                         ] = refl["intensity"]
+                mask[qx0 + tx_pixels[i], qy0 + ty_pixels[i]] = True
         else:
             xpix = np.round(
                 bloch[0].data["qx"] / pixel_size_inv_A + tx_pixels[i] + qx0
@@ -613,13 +630,14 @@ def generate_CBED(
             for patt, sim in zip(DP, bloch):
                 patt[xpix, ypix] += sim.data["intensity"][keep_mask]
 
-    ret = [DP[0] if len(thickness) == 1 else DP,]
+    ret = [
+        DP[0] if len(thickness) == 1 else DP,
+    ]
     if return_mask:
         ret.append(mask)
     if return_ZA:
         ZA_img = np.zeros(keep_mask.shape + (3,))
-        ZA_img[keep_mask,:] = tZA
+        ZA_img[keep_mask, :] = tZA
         ret.append(ZA_img)
 
     return ret[0] if len(ret) == 1 else ret
-
