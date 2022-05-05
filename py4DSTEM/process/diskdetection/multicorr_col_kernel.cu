@@ -36,7 +36,7 @@ void multicorr_col_kernel(
 	if (tid < N_pts * image_size_y * kernel_size) {
 		// np.fft.ifftshift(np.arange(imageSize[1])) - np.floor(imageSize[1]/2)
 		// modresult is necessary to get the Pythonic behavior of mod of negative numbers
-		int modresult = int(col_idx - ceil((float)image_size_y / 2.)) % image_size_y;
+		int modresult = int(row_idx - ceil((float)image_size_y / 2.)) % image_size_y;
 		modresult = modresult < 0 ? modresult + image_size_y : modresult;
 		float columnEntry = float(modresult) - floor((float)image_size_y/2.) ; 
 
@@ -47,10 +47,10 @@ void multicorr_col_kernel(
 		ar[tid] = exp(prefactor * columnEntry * rowEntry);
 
 		// Use these for testing the indexing:
-		//ar[tid] = complex<float>(0,(float)tid);
-		//ar[tid] = complex<float>(0,(float)kernel_idx);
-		//ar[tid] = complex<float>(0,(float)row_idx);
-		//ar[tid] = complex<float>(0,(float)col_idx);
+		// ar[tid] = complex<float>(0,(float)tid);
+		// ar[tid] = complex<float>(0,(float)kernel_idx);
+		// ar[tid] = complex<float>(0,(float)row_idx);
+		// ar[tid] = complex<float>(0,(float)col_idx);
 	}
 
 }
