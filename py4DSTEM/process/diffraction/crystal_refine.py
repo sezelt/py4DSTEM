@@ -349,7 +349,7 @@ def index_Bragg_peaks_from_orientation(
     )
 
     sim_peaks = self.generate_diffraction_pattern(
-        zone_axis=orientation,
+        orientation_matrix=orientation,
         sigma_excitation_error=sigma_excitation_error,
         tol_excitation_error_mult=tol_excitation_error_mult,
         tol_intensity=tol_intensity,

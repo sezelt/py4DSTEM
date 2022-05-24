@@ -519,7 +519,7 @@ def generate_CBED(
         alpha_rad / self.wavelength / pixel_size_inv_A
     )  # radius of aperture in pixels
 
-    tx_pixels, ty_pixels = np.meshgrid(
+    ty_pixels, tx_pixels = np.meshgrid(
         np.arange(-alpha_pix, alpha_pix + 1), np.arange(-alpha_pix, alpha_pix + 1)
     )  # plane waves in pixel units
 
