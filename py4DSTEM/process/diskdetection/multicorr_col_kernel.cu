@@ -23,12 +23,17 @@ void multicorr_col_kernel(
 	int kernel_size = ceil(1.5 * upsample_factor);
 
 	int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+	// Using strides to compute indices:
+	int stride_0 = image_size_y * kernel_size; // Stride along 0-th dimension of ar
+	int stride_1 = kernel_size; // Stride along 1-th dimension of ar
+
 	// Which kernel in the stack (first index of ar)
-	int kernel_idx = tid / (kernel_size * image_size_y);
+	int kernel_idx = tid / stride_0;
 	// Which row in the kernel (second index of ar)
-	int row_idx = (tid - (kernel_size*image_size_y)*kernel_idx) / kernel_size;
+	int row_idx = (tid % stride_0) / stride_1;
 	// Which column in the kernel (last index of ar)
-	int col_idx = (tid - (kernel_size*image_size_y)*kernel_idx - kernel_size*row_idx) % kernel_size;
+	int col_idx = (tid % stride_0) % stride_1;
 
 	complex<float> prefactor = complex<float>(0,-2.0 * PI) / float(image_size_y * upsample_factor);
 
