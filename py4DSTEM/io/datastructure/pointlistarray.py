@@ -120,7 +120,7 @@ def save_pointlistarray_group(group, pointlistarray):
     dset = group.create_dataset(name,pointlistarray.shape,pointlist_dtype)
 
     for (i,j) in tqdmnd(dset.shape[0],dset.shape[1]):
-        dset[i,j] = pointlistarray.get_pointlist(i,j).data
+        dset[i,j] = np.atleast_1d(pointlistarray.get_pointlist(i,j).data)
 
 def get_pointlistarray_from_grp(g):
     """ Accepts an h5py Group corresponding to a pointlistarray in an open, correctly formatted H5 file,

@@ -31,7 +31,7 @@ def calibrate_Bragg_peaks_rotation(
         braggpeaks_rotated  (PointListArray) the rotated Bragg peaks
     """
 
-    assert isinstance(braggpeaks, PointListArray)
+    # assert isinstance(braggpeaks, PointListArray)
     assert (theta is not None and flip is not None) != (
         coords is not None
     ), "Either (qx0,qy0) or coords must be specified"

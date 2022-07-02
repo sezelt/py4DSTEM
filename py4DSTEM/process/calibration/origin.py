@@ -199,7 +199,7 @@ def get_origin_from_braggpeaks(braggpeaks, Q_Nx, Q_Ny, findcenter="CoM", bvm=Non
               the Bragg peaks identified with the unscattered beam. Useful for diagnostic
               purposes.
     """
-    assert isinstance(braggpeaks, PointListArray), "braggpeaks must be a PointListArray"
+    # assert isinstance(braggpeaks, PointListArray), "braggpeaks must be a PointListArray"
     assert all([isinstance(item, (int, np.integer)) for item in [Q_Nx, Q_Ny]])
     assert isinstance(findcenter, str), "center must be a str"
     assert findcenter in ["CoM", "max"], "center must be either 'CoM' or 'max'"
@@ -713,7 +713,7 @@ def center_braggpeaks(braggpeaks, qx0=None, qy0=None, coords=None, name=None):
     Returns:
         braggpeaks_centered  (PointListArray) the centered Bragg peaks
     """
-    assert isinstance(braggpeaks, PointListArray)
+    # assert isinstance(braggpeaks, PointListArray)
     assert (qx0 is not None and qy0 is not None) != (
         coords is not None
     ), "Either (qx0,qy0) or coords must be specified"

@@ -88,7 +88,7 @@ def calibrate_Bragg_peaks_pixel_size(
     Returns:
         braggpeaks_calibrated  (PointListArray) the calibrated Bragg peaks
     """
-    assert isinstance(braggpeaks, PointListArray)
+    # assert isinstance(braggpeaks, PointListArray)
     assert (q_pixel_size is not None) != (
         coords is not None
     ), "Either (qx0,qy0) or coords must be specified"
