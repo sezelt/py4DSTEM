@@ -110,6 +110,46 @@ def estimate_thickness(
 
     return thickness[np.nanargmin(scores)]
 
+def estimate_thickness_tilt_multi_step(
+    self,
+    bragg_peaks: PointList,
+    orientation: np.ndarray,
+    bloch_beams: PointList,
+    thickness: np.ndarray,
+    min_peaks: int = 4,
+    tilt_refine_range=[60., 9., 1.5],
+    tilt_refine_step_size_inv_A=[0.5, 0.06, 0.01],
+    normalize_to_direct_beam=True,
+    plot_corr: bool=False,
+):
+    
+    ZA_test = orientation_matrices.matrix[xsel,ysel,0]
+    
+    for refine_range, refine_step in zip(tilt_refine_range, tilt_refine_step_size_inv_A):
+        fig,ax = plt.subplots(1,2,figsize=(15,5)) if plot_corr else (None, None)
+        
+        t_test, ZA_test, scores = xtal.estimate_thickness_tilt(
+            bragg_peaks 
+            ZA_test, 
+            bloch_beams, 
+            thickness,
+            tilt_refine_range = refine_range,
+            tilt_refine_step_size_inv_A=refine_step,
+            min_peaks=min_peaks,
+            normalize_to_direct_beam=normalize_to_direct_beam,
+            return_best_match_pointlist=False,
+            return_scores=True,
+            ax=ax,
+            verbose=False)
+        
+        if plot_corr:
+            # todo: put the vline in the main thickness function
+            ax[0].axvline(t_test, linestyle='--', c='b')
+            plt.show()
+            
+    return t_test, ZA_test
+        
+        
 
 def estimate_thickness_tilt(
     self,
