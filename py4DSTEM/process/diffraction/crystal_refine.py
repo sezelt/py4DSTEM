@@ -129,7 +129,7 @@ def estimate_thickness_tilt_multi_step(
         fig,ax = plt.subplots(1,2,figsize=(15,5)) if plot_corr else (None, None)
         
         t_test, ZA_test, scores = xtal.estimate_thickness_tilt(
-            bragg_peaks 
+            bragg_peaks, 
             ZA_test, 
             bloch_beams, 
             thickness,
