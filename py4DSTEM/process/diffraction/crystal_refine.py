@@ -403,8 +403,10 @@ def index_Bragg_peaks_from_orientation(
     # Accumulate matches as a list of len-1 arrays, then concatenate later
     # TODO: do this a smarter way
     matches = []
+    bragg_peaks.data = np.atleast_1d(bragg_peaks.data)
+    sim_peaks.data = np.atleast_1d(sim_peaks.data)
     # loop over all experimental peaks
-    for i in range(bragg_peaks.length):
+    for i in range(np.atleast_1d(bragg_peaks.data).shape[0]):
         # get current peak
         qx, qy = bragg_peaks.data["qx"][i], bragg_peaks.data["qy"][i]
 

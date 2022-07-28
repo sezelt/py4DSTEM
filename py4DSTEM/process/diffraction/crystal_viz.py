@@ -814,14 +814,16 @@ def plot_diffraction_pattern(
         def overline(x):
             return str(x) if x >= 0 else (r"\overline{" + str(np.abs(x)) + "}")
 
-        for a0 in range(bragg_peaks.data.shape[0]):
-            h = bragg_peaks.data["h"][a0]
-            k = bragg_peaks.data["k"][a0]
-            l = bragg_peaks.data["l"][a0]
+        marker_size = np.atleast_1d(np.array(marker_size))
+        bpd = np.atleast_1d(bragg_peaks.data)
+        for a0 in range(bpd.shape[0]):
+            h = bpd["h"][a0]
+            k = bpd["k"][a0]
+            l = bpd["l"][a0]
 
             ax.text(
-                bragg_peaks.data["qy"][a0],
-                bragg_peaks.data["qx"][a0]
+                bpd["qy"][a0],
+                bpd["qx"][a0]
                 - shift_labels
                 - shift_marker * np.sqrt(marker_size[a0]),
                 "$" + overline(h) + overline(k) + overline(l) + "$",
