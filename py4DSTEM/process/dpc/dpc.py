@@ -1,8 +1,8 @@
 # Functions for differential phase contrast imaging
 
 import numpy as np
-from ..utils import make_Fourier_coords2D, print_progress_bar
-from ...io import DataCube
+from py4DSTEM.process.utils import make_Fourier_coords2D, tqdmnd
+from py4DSTEM.io import DataCube
 
 ############################# DPC Functions ################################
 
@@ -15,7 +15,7 @@ def get_CoM_images(datacube, mask=None, normalize=True):
 
     Args:
         datacube (DataCube): the 4D-STEM data
-        mask (2D array): optionally, calculate the CoM only in the areas where mask==True
+        mask (2D array): optionally, calculate the CoM only in the areas where mask==True. The function will cast the input array to a bool dtype
         normalize (bool): if true, subtract off the mean of the CoM images
 
     Returns:
@@ -26,9 +26,14 @@ def get_CoM_images(datacube, mask=None, normalize=True):
 
     # Coordinates
     qy,qx = np.meshgrid(np.arange(datacube.Q_Ny),np.arange(datacube.Q_Nx))
-    if mask is not None:
-        qx *= mask
-        qy *= mask
+    if mask is None:
+        mask = np.ones_like(qx).astype(bool)
+    else:
+        assert qy.shape == mask.shape, f"The mask shape {mask.shape} must equal the diffraction pattern shape {qy.shape}."
+        mask = mask.astype(bool)
+
+    qx *= mask
+    qy *= mask
 
     # Get CoM
     CoMx = np.zeros((datacube.R_Nx,datacube.R_Ny))
@@ -145,7 +150,7 @@ def get_rotation_and_flip_zerocurl(CoMx, CoMy, Q_Nx, Q_Ny, n_iter=100, stepsize=
 
 def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2,
                                       regLowPass=0.5, regHighPass=100, stepsize=1,
-                                      n_iter=1, return_stds=False, verbose=True):
+                                      n_iter=1, return_stds=False):
     """
     Find the rotation offset between real space and diffraction space, and whether there
     exists a relative axis flip their coordinate systems, starting from the premise that
@@ -201,24 +206,22 @@ def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2,
     stds_f = np.zeros(N_thetas)
 
     # Unflipped
-    for i,theta in enumerate(thetas):
+    for i in tqdmnd(range(thetas.shape[0])):
+        theta = thetas[i]
         phase, error = get_phase_from_CoM(CoMx, CoMy, theta=theta, flip=False,
                                           regLowPass=regLowPass, regHighPass=regHighPass,
                                           paddingfactor=paddingfactor, stepsize=stepsize,
                                           n_iter=n_iter)
         stds[i] = np.std(phase)
-        if verbose:
-            print_progress_bar(i+1, 2*N_thetas, prefix='Analyzing:', suffix='Complete.', length=50)
 
     # Flipped
-    for i,theta in enumerate(thetas):
+    for i in tqdmnd(range(thetas.shape[0])):
+        theta = thetas[i]
         phase, error = get_phase_from_CoM(CoMx, CoMy, theta=theta, flip=True,
                                           regLowPass=regLowPass, regHighPass=regHighPass,
                                           paddingfactor=paddingfactor, stepsize=stepsize,
                                           n_iter=n_iter)
         stds_f[i] = np.std(phase)
-        if verbose:
-            print_progress_bar(N_thetas+i+1, 2*N_thetas, prefix='Analyzing:', suffix='Complete.', length=50)
 
     flip = np.max(stds_f)>np.max(stds)
     if flip:
@@ -231,8 +234,19 @@ def get_rotation_and_flip_maxcontrast(CoMx, CoMy, N_thetas, paddingfactor=2,
     else:
         return theta, flip
 
-def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100,
-                        paddingfactor=2, stepsize=1, n_iter=10, phase_init=None):
+def get_phase_from_CoM(
+    CoMx, 
+    CoMy, 
+    theta, 
+    flip, 
+    regLowPass=0.5, 
+    regHighPass=100,
+    paddingfactor=2, 
+    stepsize=1, 
+    n_iter=10, 
+    phase_init=None,
+    progress_bar = False,
+    ):
     """
     Calculate the phase of the sample transmittance from the diffraction centers of mass.
     A bare bones description of the approach taken here is below - for detailed
@@ -273,6 +287,7 @@ def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100,
         stepsize (float): the stepsize in the iteration step which updates the phase
         n_iter (int): the number of iterations
         phase_init (2D array): initial guess for the phase
+        progress_bar (bool):  Enable progressbar
 
     Returns:
         (2-tuple) A 2-tuple containing:
@@ -324,7 +339,12 @@ def get_phase_from_CoM(CoMx, CoMy, theta, flip, regLowPass=0.5, regHighPass=100,
         phase[:R_Nx,:R_Ny] = phase_init
 
     # Iterative reconstruction
-    for i in range(n_iter):
+    for i in tqdmnd(
+        range(n_iter),
+        desc="Reconstructing phase",
+        unit=" iterations",
+        disable=not progress_bar,
+        ):
 
         # Update gradient estimates using measured CoM values
         dx[mask] -= CoMx_rot.ravel()

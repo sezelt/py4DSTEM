@@ -8,8 +8,8 @@ try:
     import numba as nb
 except ImportError:
     pass
-from ...process.utils import tqdmnd
-from ..datastructure import DataCube
+from py4DSTEM.utils.tqdmnd import tqdmnd
+from py4DSTEM.io.datastructure import DataCube
 
 
 def read_gatan_K2_bin(fp, mem="MEMMAP", binfactor=1, metadata=False, **kwargs):
@@ -158,6 +158,7 @@ class K2DataArray(Sequence):
         )
 
         # needed for Dask support:
+        self.ndim = 4
         self.ndims = 4
         self.dtype = np.int16
 

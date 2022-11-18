@@ -25,7 +25,7 @@ setup(
     install_requires=[
         'numpy >= 1.19',
         'scipy >= 1.5.2',
-        'h5py >= 2.10.0',
+        'h5py >= 3.2.0',
         'ncempy >= 1.8.1',
         'matplotlib >= 3.4.2',
         'scikit-image >= 0.17.2',
@@ -43,7 +43,7 @@ setup(
     extras_require={
         'ipyparallel': ['ipyparallel >= 6.2.4', 'dill >= 0.3.3'],
         'cuda': ['cupy'],
-        'acom': ['pymatgen'],
+        'acom': ['pymatgen >= 2022', 'mp-api == 0.24.1'],
         'aiml': ['tensorflow == 2.4.1','tensorflow-addons <= 0.14.0','crystal4D'],
         'aiml-cuda': ['tensorflow == 2.4.1','tensorflow-addons <= 0.14.0','crystal4D','cupy'],
         'numba': ['numba >= 0.49.1']

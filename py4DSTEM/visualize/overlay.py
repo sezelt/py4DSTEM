@@ -5,7 +5,7 @@ from matplotlib.colors import is_color_like
 from numbers import Number
 from math import log
 from fractions import Fraction
-from ..io import PointList
+from py4DSTEM.io.datastructure import PointList
 
 def add_rectangles(ax,d):
     """
@@ -157,19 +157,20 @@ def add_annuli(ax,d):
     assert(all([isinstance(x,tuple) for x in center]))
     assert(all([len(x)==2 for x in center]))
     # radii
-    assert('Ri' in d.keys())
-    assert('Ro' in d.keys())
-    Ri,Ro = d['Ri'],d['Ro']
-    if isinstance(Ri,Number):
-        Ri = [Ri for i in range(N)]
-    if isinstance(Ro,Number):
-        Ro = [Ro for i in range(N)]
-    assert(isinstance(Ri,list))
-    assert(isinstance(Ro,list))
-    assert(len(Ri)==N)
-    assert(len(Ro)==N)
-    assert(all([isinstance(i,Number) for i in Ri]))
-    assert(all([isinstance(i,Number) for i in Ro]))
+    assert('radii' in d.keys())
+    radii = d['radii']
+    if isinstance(radii,tuple):
+        assert(len(radii)==2)
+        ri = [radii[0] for i in range(N)]
+        ro = [radii[1] for i in range(N)]
+    else:
+        assert(isinstance(radii,list))
+        assert(all([isinstance(x,tuple) for x in radii]))
+        assert(len(radii)==N)
+        ri = [radii[i][0] for i in range(N)]
+        ro = [radii[i][1] for i in range(N)]
+    assert(all([isinstance(i,Number) for i in ri]))
+    assert(all([isinstance(i,Number) for i in ro]))
     # color
     color = d['color'] if 'color' in d.keys() else 'r'
     if isinstance(color,list):
@@ -203,15 +204,15 @@ def add_annuli(ax,d):
         assert(len(linewidth)==N)
         assert(all([isinstance(lw,(float,int,np.float)) for lw in linewidth]))
     # additional parameters
-    kws = [k for k in d.keys() if k not in ('center','Ri','Ro','color','fill','alpha','linewidth')]
+    kws = [k for k in d.keys() if k not in ('center','radii','color','fill','alpha','linewidth')]
     kwargs = dict()
     for k in kws:
         kwargs[k] = d[k]
 
     # add the annuli
     for i in range(N):
-        cent,ri,ro,col,f,a,lw = center[i],Ri[i],Ro[i],color[i],fill[i],alpha[i],linewidth[i]
-        annulus = Wedge((cent[1],cent[0]),ro,0,360,width=ro-ri,color=col,fill=f,alpha=a,
+        cent,Ri,Ro,col,f,a,lw = center[i],ri[i],ro[i],color[i],fill[i],alpha[i],linewidth[i]
+        annulus = Wedge((cent[1],cent[0]),Ro,0,360,width=Ro-Ri,color=col,fill=f,alpha=a,
                         linewidth=lw,**kwargs)
         ax.add_patch(annulus)
 
@@ -687,15 +688,15 @@ def add_scalebar(ax,d):
 
     # Add label
     if label:
-        labeltext = str(length_units)+' '+pixelunits
+        labeltext = f'{np.round(length_units,3)}'+' '+pixelunits
         if xshiftdir>0: va='top'
         else: va='bottom'
         ax.text(labelpos_y,labelpos_x,labeltext,size=labelsize,
                 color=labelcolor,alpha=alpha,ha='center',va=va)
 
-    if not ticks:
-        ax.set_xticks([])
-        ax.set_yticks([])
+    # if not ticks:
+    #     ax.set_xticks([])
+    #     ax.set_yticks([])
     return
 
 
@@ -1024,22 +1025,28 @@ def get_nice_spacing(Nx,Ny,pixelsize):
     if np.sign(log(D,10))<0:
         exp-=1
     base = D/(10**exp)
-    if base>=1 and base<1.25:
-        _spacing=0.4
-    elif base>=1.25 and base<1.75:
+    if base>=1 and base<2.1:
         _spacing=0.5
-    elif base>=1.75 and base<2.5:
-        _spacing=0.75
-    elif base>=2.5 and base<3.25:
+    elif base>=2.1 and base<4.6:
         _spacing=1
-    elif base>=3.25 and base<4.75:
-        _spacing=1.5
-    elif base>=4.75 and base<6:
+    elif base>=4.6 and base<10:
         _spacing=2
-    elif base>=6 and base<8:
-        _spacing=2.5
-    elif base>=8 and base<10:
-        _spacing=3
+    # if base>=1 and base<1.25:
+    #     _spacing=0.4
+    # elif base>=1.25 and base<1.75:
+    #     _spacing=0.5
+    # elif base>=1.75 and base<2.5:
+    #     _spacing=0.75
+    # elif base>=2.5 and base<3.25:
+    #     _spacing=1
+    # elif base>=3.25 and base<4.75:
+    #     _spacing=1.5
+    # elif base>=4.75 and base<6:
+    #     _spacing=2
+    # elif base>=6 and base<8:
+    #     _spacing=2.5
+    # elif base>=8 and base<10:
+    #     _spacing=3
     else:
         raise Exception("how did this happen?? base={}".format(base))
     spacing = _spacing * 10**exp

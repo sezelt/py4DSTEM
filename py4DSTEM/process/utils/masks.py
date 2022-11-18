@@ -1,7 +1,7 @@
 # Functions for generating masks
 
 import numpy as np
-from scipy.ndimage.morphology import binary_dilation
+from scipy.ndimage import binary_dilation
 
 def get_beamstop_mask(dp,qx0,qy0,theta,dtheta=1,w=10,r=10):
     """
@@ -51,7 +51,8 @@ def get_beamstop_mask(dp,qx0,qy0,theta,dtheta=1,w=10,r=10):
 
 def make_circular_mask(shape, qxy0, radius):
     """
-    # Create a hard circular mask, for use in DPC integration.
+    Create a hard circular mask, for use in DPC integration or
+    or to use as a filter in diffraction or real space.
 
     Args:
         shape       (2-tuple of ints) image size, in pixels

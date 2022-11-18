@@ -3,14 +3,15 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Wedge
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial import Voronoi
-from . import show
-from .overlay import add_pointlabels,add_vector,add_bragg_index_labels,add_ellipses
-from .vis_grid import show_image_grid
-from .vis_RQ import ax_addaxes,ax_addaxes_QtoR
-from ..io import PointList
-from ..process.utils import get_voronoi_vertices,convert_ellipse_params
-from ..process.calibration import double_sided_gaussian
-from ..process.latticevectors import get_selected_lattice_vectors
+from py4DSTEM.visualize import show
+from py4DSTEM.visualize.overlay import add_pointlabels,add_vector,add_bragg_index_labels,add_ellipses
+from py4DSTEM.visualize.overlay import add_points
+from py4DSTEM.visualize.vis_grid import show_image_grid
+from py4DSTEM.visualize.vis_RQ import ax_addaxes,ax_addaxes_QtoR
+from py4DSTEM.io.datastructure import DataCube,Calibration,PointList
+from py4DSTEM.process.utils import get_voronoi_vertices,convert_ellipse_params
+from py4DSTEM.process.calibration import double_sided_gaussian
+from py4DSTEM.process.latticevectors import get_selected_lattice_vectors
 
 def show_elliptical_fit(ar,fitradii,p_ellipse,fill=True,
                         color_ann='y',color_ell='r',alpha_ann=0.2,alpha_ell=0.7,
@@ -35,10 +36,19 @@ def show_elliptical_fit(ar,fitradii,p_ellipse,fill=True,
     Ri,Ro = fitradii
     qx0,qy0,a,b,theta = p_ellipse
     fig,ax = show(ar,
-                  annulus={'center':(qx0,qy0),'Ri':Ri,'Ro':Ro,'fill':fill,
-                           'color':color_ann,'alpha':alpha_ann,'linewidth':linewidth_ann},
-                  ellipse={'center':(qx0,qy0),'a':a,'b':b,'theta':theta,
-                           'color':color_ell,'alpha':alpha_ell,'linewidth':linewidth_ell},
+                  annulus={'center':(qx0,qy0),
+                           'radii':(Ri,Ro),
+                           'fill':fill,
+                           'color':color_ann,
+                           'alpha':alpha_ann,
+                           'linewidth':linewidth_ann},
+                  ellipse={'center':(qx0,qy0),
+                           'a':a,
+                           'b':b,
+                           'theta':theta,
+                           'color':color_ell,
+                           'alpha':alpha_ell,
+                           'linewidth':linewidth_ell},
                   returnfig=True,**kwargs)
 
     if not returnfig:
@@ -127,10 +137,20 @@ def show_amorphous_ring_fit(dp,fitradii,p_dsg,N=12,cmap=('gray','gray'),
         return fig,ax
 
 
-def show_qprofile(q,intensity,ymax,figsize=(12,4),returnfig=False,
-                  color='k',xlabel='q (pixels)',ylabel='Intensity (A.U.)',
-                  labelsize=16,ticklabelsize=14,grid='on',label=None,
-                  **kwargs):
+def show_qprofile(
+    q,
+    intensity,
+    ymax=None,
+    figsize=(12,4),
+    returnfig=False,
+    color='k',
+    xlabel='q (pixels)',
+    ylabel='Intensity (A.U.)',  
+    labelsize=16,
+    ticklabelsize=14,
+    grid='on',
+    label=None,
+    **kwargs):
     """
     Plots a diffraction space radial profile.
     Params:
@@ -145,6 +165,9 @@ def show_qprofile(q,intensity,ymax,figsize=(12,4),returnfig=False,
         grid            'off' or 'on'
         label           a legend label for the plotted curve
     """
+    if ymax is None:
+        ymax = np.max(intensity)*1.05
+
     fig,ax = plt.subplots(figsize=figsize)
     ax.plot(q,intensity,color=color,label=label)
     ax.grid(grid)
@@ -159,18 +182,60 @@ def show_qprofile(q,intensity,ymax,figsize=(12,4),returnfig=False,
     else:
         return fig,ax
 
-def show_kernel(kernel,R,L,W,figsize=(12,6),returnfig=False,**kwargs):
+def show_kernel(
+    kernel,
+    R,
+    L,
+    W,
+    figsize=(12,6),
+    returnfig=False,
+    **kwargs):
     """
     Plots, side by side, the probe kernel and its line profile.
     R is the kernel plot's window size.
-    L and W are the lenth ad width of the lineprofile.
+    L and W are the length and width of the lineprofile.
     """
-    lineprofile = np.concatenate([np.sum(kernel[-L:,:W],axis=(1)),
-                                  np.sum(kernel[:L,:W],axis=(1))])
+    lineprofile_1 = np.concatenate([
+        np.sum(kernel[-L:,:W],axis=1),
+        np.sum(kernel[:L,:W],axis=1)
+    ])
+    lineprofile_2 = np.concatenate([
+        np.sum(kernel[:W,-L:],axis=0),
+        np.sum(kernel[:W,:L],axis=0)
+    ])
+
+    im_kernel = np.vstack([
+        np.hstack([
+            kernel[-int(R):,-int(R):],
+            kernel[-int(R):,:int(R)]
+        ]),
+        np.hstack([
+            kernel[:int(R),-int(R):],
+            kernel[:int(R),:int(R)]
+        ]),
+    ])
 
     fig,axs = plt.subplots(1,2,figsize=figsize)
-    axs[0].matshow(kernel[:int(R),:int(R)],cmap='gray')
-    axs[1].plot(np.arange(len(lineprofile)),lineprofile)
+    axs[0].matshow(im_kernel,cmap='gray')
+    axs[0].plot(
+        np.ones(2*R)*R,
+        np.arange(2*R),
+        c='r')
+    axs[0].plot(
+        np.arange(2*R),
+        np.ones(2*R)*R,
+        c='c')
+
+
+    axs[1].plot(
+        np.arange(len(lineprofile_1)),
+        lineprofile_1,
+        c='r')
+    axs[1].plot(
+        np.arange(len(lineprofile_2)),
+        lineprofile_2,
+        c='c')
+
     if not returnfig:
         plt.show()
         return
@@ -243,40 +308,41 @@ def show_class_BPs_grid(ar,H,W,x,y,get_s,s2,color='r',color2='y',returnfig=False
     else:
         return fig,axs
 
-def show_strain(strainmap,
-                vrange_exx,
-                vrange_theta,
-                vrange_exy=None,
-                vrange_eyy=None,
-                bkgrd=True,
-                show_cbars=('exx','eyy','exy','theta'),
-                bordercolor='k',
-                borderwidth=1,
-                titlesize=24,
-                ticklabelsize=16,
-                ticknumber=5,
-                unitlabelsize=24,
-                show_axes=True,
-                axes_x0=0,
-                axes_y0=0,
-                xaxis_x=1,
-                xaxis_y=0,
-                axes_length=10,
-                axes_width=1,
-                axes_color='r',
-                xaxis_space='Q',
-                labelaxes=True,
-                QR_rotation=0,
-                axes_labelsize=12,
-                axes_labelcolor='r',
-                axes_plots=('exx'),
-                cmap='RdBu_r',
-                layout=0,
-                figsize=(12,12),
-                returnfig=False):
+def show_strain(
+    strainmap,
+    vrange_exx,
+    vrange_theta,
+    vrange_exy=None,
+    vrange_eyy=None,
+    bkgrd=True,
+    show_cbars=('exx','eyy','exy','theta'),
+    bordercolor='k',
+    borderwidth=1,
+    titlesize=24,
+    ticklabelsize=16,
+    ticknumber=5,
+    unitlabelsize=24,
+    show_axes=True,
+    axes_x0=0,
+    axes_y0=0,
+    xaxis_x=1,
+    xaxis_y=0,
+    axes_length=10,
+    axes_width=1,
+    axes_color='r',
+    xaxis_space='Q',
+    labelaxes=True,
+    QR_rotation=0,
+    axes_labelsize=12,
+    axes_labelcolor='r',
+    axes_plots=('exx'),
+    cmap='RdBu_r',
+    layout=0,
+    figsize=(12,12),
+    returnfig=False):
     """
     Display a strain map, showing the 4 strain components (e_xx,e_yy,e_xy,theta), and
-    masking each image with strainmap.slices['mask'].
+    masking each image with strainmap.get_slice('mask') 
 
     Args:
         strainmap (RealSlice):
@@ -335,13 +401,14 @@ def show_strain(strainmap,
     vmin_exx,vmax_exx = vrange_exx[0]/100.,vrange_exx[1]/100.
     vmin_eyy,vmax_eyy = vrange_eyy[0]/100.,vrange_eyy[1]/100.
     vmin_exy,vmax_exy = vrange_exy[0]/100.,vrange_exy[1]/100.
-    vmin_theta,vmax_theta = vrange_theta[0]/100.,vrange_theta[1]/100.
+    # theta is plotted in units of degrees
+    vmin_theta,vmax_theta = vrange_theta[0]/(180.0/np.pi),vrange_theta[1]/(180.0/np.pi)
 
     # Get images
-    e_xx = np.ma.array(strainmap.slices['e_xx'],mask=strainmap.slices['mask']==False)
-    e_yy = np.ma.array(strainmap.slices['e_yy'],mask=strainmap.slices['mask']==False)
-    e_xy = np.ma.array(strainmap.slices['e_xy'],mask=strainmap.slices['mask']==False)
-    theta = np.ma.array(strainmap.slices['theta'],mask=strainmap.slices['mask']==False)
+    e_xx = np.ma.array(strainmap.get_slice('e_xx').data,mask=strainmap.get_slice('mask').data==False)
+    e_yy = np.ma.array(strainmap.get_slice('e_yy').data,mask=strainmap.get_slice('mask').data==False)
+    e_xy = np.ma.array(strainmap.get_slice('e_xy').data,mask=strainmap.get_slice('mask').data==False)
+    theta = np.ma.array(strainmap.get_slice('theta').data,mask=strainmap.get_slice('mask').data==False)
 
     # Plot
     if layout==0:
@@ -350,14 +417,38 @@ def show_strain(strainmap,
         fig,(ax11,ax12,ax21,ax22) = plt.subplots(1,4,figsize=figsize)
     else:
         fig,(ax11,ax12,ax21,ax22) = plt.subplots(4,1,figsize=figsize)
-    cax11 = show(e_xx,figax=(fig,ax11),min=vmin_exx,max=vmax_exx,clipvals='manual',
-                 cmap=cmap,returncax=True)
-    cax12 = show(e_yy,figax=(fig,ax12),min=vmin_eyy,max=vmax_eyy,clipvals='manual',
-                 cmap=cmap,returncax=True)
-    cax21 = show(e_xy,figax=(fig,ax21),min=vmin_exy,max=vmax_exy,clipvals='manual',
-                 cmap=cmap,returncax=True)
-    cax22 = show(theta,figax=(fig,ax22),min=vmin_theta,max=vmax_theta,clipvals='manual',
-                 cmap=cmap,returncax=True)
+    cax11 = show(
+        e_xx,
+        figax=(fig,ax11),
+        vmin=vmin_exx,
+        vmax=vmax_exx,
+        intensity_range='absolute',
+        cmap=cmap,
+        returncax=True)
+    cax12 = show(
+        e_yy,
+        figax=(fig,ax12),
+        vmin=vmin_eyy,
+        vmax=vmax_eyy,
+        intensity_range='absolute',
+        cmap=cmap,
+        returncax=True)
+    cax21 = show(
+        e_xy,
+        figax=(fig,ax21),
+        vmin=vmin_exy,
+        vmax=vmax_exy,
+        intensity_range='absolute',
+        cmap=cmap,
+        returncax=True)
+    cax22 = show(
+        theta,
+        figax=(fig,ax22),
+        vmin=vmin_theta,
+        vmax=vmax_theta,
+        intensity_range='absolute',
+        cmap=cmap,
+        returncax=True)
     ax11.set_title(r'$\epsilon_{xx}$',size=titlesize)
     ax12.set_title(r'$\epsilon_{yy}$',size=titlesize)
     ax21.set_title(r'$\epsilon_{xy}$',size=titlesize)
@@ -365,8 +456,9 @@ def show_strain(strainmap,
 
     # Add black background
     if bkgrd:
-        mask = np.ma.masked_where(strainmap.slices['mask'].astype(bool),
-                                  np.zeros_like(strainmap.slices['mask']))
+        mask = np.ma.masked_where(
+            strainmap.get_slice('mask').data.astype(bool),
+            np.zeros_like(strainmap.get_slice('mask').data))
         ax11.matshow(mask,cmap='gray')
         ax12.matshow(mask,cmap='gray')
         ax21.matshow(mask,cmap='gray')
@@ -384,17 +476,24 @@ def show_strain(strainmap,
         cbax12 = divider12.append_axes(layout_p[1],size="4%",pad=0.15)
         cbax21 = divider21.append_axes(layout_p[2],size="4%",pad=0.15)
         cbax22 = divider22.append_axes(layout_p[3],size="4%",pad=0.15)
-        for (show_cbar,cax,cbax,vmin,vmax,tickside,tickunits) in zip(
-                                    show_cbars,
-                                    (cax11,cax12,cax21,cax22),
-                                    (cbax11,cbax12,cbax21,cbax22),
-                                    (vmin_exx,vmin_eyy,vmin_exy,vmin_theta),
-                                    (vmax_exx,vmax_eyy,vmax_exy,vmax_theta),
-                                    (layout_p[0],layout_p[1],layout_p[2],layout_p[3]),
-                                    ('% ',' %','% ',r' $^\circ$')):
+        for (ind,show_cbar,cax,cbax,vmin,vmax,tickside,tickunits) in zip(
+            range(4),
+            show_cbars,
+            (cax11,cax12,cax21,cax22),
+            (cbax11,cbax12,cbax21,cbax22),
+            (vmin_exx,vmin_eyy,vmin_exy,vmin_theta),
+            (vmax_exx,vmax_eyy,vmax_exy,vmax_theta),
+            (layout_p[0],layout_p[1],layout_p[2],layout_p[3]),
+            ('% ',' %','% ',r' $^\circ$')):
             if show_cbar:
                 ticks = np.linspace(vmin,vmax,ticknumber,endpoint=True)
-                ticklabels = (np.round(np.linspace(100*vmin,100*vmax,ticknumber,endpoint=True)*100)/100).astype(str)
+                if ind < 3:
+                    ticklabels = np.round(np.linspace(
+                        100*vmin,100*vmax,ticknumber,endpoint=True),decimals=2).astype(str)
+                else:
+                    ticklabels = np.round(np.linspace(
+                        (180/np.pi)*vmin,(180/np.pi)*vmax,ticknumber,endpoint=True),decimals=2).astype(str)
+
                 if tickside in ('left','right'):
                     cb = plt.colorbar(cax,cax=cbax,ticks=ticks,orientation='vertical')
                     cb.ax.set_yticklabels(ticklabels,size=ticklabelsize)
@@ -580,3 +679,208 @@ def show_max_peak_spacing(ar,spacing,braggdirections,color='g',lw=2,returnfig=Fa
     else:
         plt.show()
         return
+
+def show_origin_meas(data):
+    """
+    Show the measured positions of the origin.
+
+    Args:
+        data (DataCube or Calibration or 2-tuple of arrays (qx0,qy0))
+    """
+    if isinstance(data,tuple):
+        assert len(data)==2
+        qx,qy = data
+    elif isinstance(data,DataCube):
+        qx,qy = data.calibration.get_origin_meas()
+    elif isinstance(data,Calibration):
+        qx,qy = data.get_origin_meas()
+    else:
+        raise Exception("data must be of type Datacube or Calibration or tuple")
+
+    show_image_grid(get_ar = lambda i:[qx,qy][i],H=1,W=2,cmap='RdBu')
+
+def show_origin_fit(data):
+    """
+    Show the measured, fit, and residuals of the origin positions.
+
+    Args:
+        data (DataCube or Calibration or (3,2)-tuple of arrays
+            ((qx0_meas,qy0_meas),(qx0_fit,qy0_fit),(qx0_residuals,qy0_residuals))
+    """
+    if isinstance(data,tuple):
+        assert len(data)==3
+        qx0_meas,qy_meas = data[0]
+        qx0_fit,qy0_fit = data[1]
+        qx0_residuals,qy0_residuals = data[2]
+    elif isinstance(data,DataCube):
+        qx0_meas,qy0_meas = data.calibration.get_origin_meas()
+        qx0_fit,qy0_fit = data.calibration.get_origin()
+        qx0_residuals,qy0_residuals = data.calibration.get_origin_residuals()
+    elif isinstance(data,Calibration):
+        qx0_meas,qy0_meas = data.get_origin_meas()
+        qx0_fit,qy0_fit = data.get_origin()
+        qx0_residuals,qy0_residuals = data.get_origin_residuals()
+    else:
+        raise Exception("data must be of type Datacube or Calibration or tuple")
+
+    show_image_grid(get_ar = lambda i:[qx0_meas,qx0_fit,qx0_residuals,
+                                       qy0_meas,qy0_fit,qy0_residuals][i],
+                    H=2,W=3,cmap='RdBu')
+
+def show_selected_dps(datacube,positions,im,bragg_pos=None,
+                      colors=None,HW=None,figsize_im=(6,6),figsize_dp=(4,4),
+                      **kwargs):
+    """
+    Shows two plots: first, a real space image overlaid with colored dots
+    at the specified positions; second, a grid of diffraction patterns
+    corresponding to these scan positions.
+
+    Args:
+        datacube (DataCube):
+        positions (len N list or tuple of 2-tuples): the scan positions
+        im (2d array): a real space image
+        bragg_pos (len N list of pointlistarrays): bragg disk positions
+            for each position. if passed, overlays the disk positions,
+            and supresses plot of the real space image
+        colors (len N list of colors or None):
+        HW (2-tuple of ints): diffraction pattern grid shape
+        figsize_im (2-tuple): size of the image figure
+        figsize_dp (2-tuple): size of each diffraction pattern panel
+        **kwargs (dict): arguments passed to visualize.show for the
+            *diffraction patterns*. Default is `scaling='log'`
+    """
+    assert isinstance(datacube,DataCube)
+    N = len(positions)
+    assert(all([len(x)==2 for x in positions])), "Improperly formated argument `positions`"
+    if bragg_pos is not None:
+        show_disk_pos = True
+        assert(len(bragg_pos)==N)
+    else:
+        show_disk_pos = False
+    if colors is None:
+        from matplotlib.cm import gist_ncar
+        linsp = np.linspace(0,1,N,endpoint=False)
+        colors = [gist_ncar(i) for i in linsp]
+    assert(len(colors)==N), "Number of positions and colors don't match"
+    from matplotlib.colors import is_color_like
+    assert([is_color_like(i) for i in colors])
+    if HW is None:
+        W = int(np.ceil(np.sqrt(N)))
+        if W<3: W=3
+        H = int(np.ceil(N/W))
+    else:
+        H,W = HW
+    assert(all([isinstance(x,(int,np.integer)) for x in (H,W)]))
+
+    x = [i[0] for i in positions]
+    y = [i[1] for i in positions]
+    if 'scaling' not in kwargs.keys():
+        kwargs['scaling'] = 'log'
+    if not show_disk_pos:
+        fig,ax = show(im,figsize=figsize_im,returnfig=True)
+        add_points(ax,d = {'x':x,'y':y,'pointcolor':colors})
+        show_image_grid(get_ar=lambda i:datacube.data[x[i],y[i],:,:],H=H,W=W,
+                        get_bordercolor=lambda i:colors[i],axsize=figsize_dp,
+                        **kwargs)
+    else:
+        show_image_grid(get_ar=lambda i:datacube.data[x[i],y[i],:,:],H=H,W=W,
+                    get_bordercolor=lambda i:colors[i],axsize=figsize_dp,
+                    get_x=lambda i:bragg_pos[i].data['qx'],
+                    get_y=lambda i:bragg_pos[i].data['qy'],
+                    get_pointcolors=lambda i:colors[i],
+                    **kwargs)
+
+def show_complex(
+    ar_complex,
+    vmin = None,
+    vmax = None,
+    cbar = True,
+    returnfig = False,
+    **kwargs
+    ):
+    '''
+    Function to plot complex arrays
+    
+    Args: 
+        ar_complex (2d array)   : complex array to be plotted
+        vmin (float, optional)  : minimum absolute value 
+        vmax (float, optional)  : maximum absolute value 
+        cbar (bool)             : if True, include color wheel
+        returnfig (bool)        : if True, the function returns the tuple (figure,axis)
+
+    Returns:
+        if returnfig==False (default), the figure is plotted and nothing is returned.
+        if returnfig==True, return the figure and the axis.
+    '''
+
+    #define min and max
+    amp = np.abs(ar_complex)
+    if vmin is None: 
+        vmin = np.min(amp)
+    if vmax is None: 
+        vmax = np.max(amp)
+    
+    from matplotlib.colors import hsv_to_rgb
+
+    #function for converting to complex colors
+    def Complex2HSV(z, vmin, vmax, hue_start=90):
+        #based on stack overflow 17044052
+        amp = np.abs(z)
+        amp = np.where(amp < vmin, vmin, amp)
+        amp = np.where(amp > vmax, vmax, amp)
+        
+        ph = np.angle(z, deg=1) + hue_start
+        
+        h = (ph % 360) / 360
+        s = 0.85 * np.ones_like(h)
+        v = (amp -vmin) / (vmax - vmin)
+        
+        return hsv_to_rgb(np.dstack((h,s,v)))
+
+    #convert to complex colors
+    rgb = Complex2HSV(ar_complex, vmin, vmax)
+    
+    #plot
+    fig, ax = show(
+        rgb,
+        returnfig = True,
+        **kwargs
+    )
+
+    #add color bar
+    if cbar == True:
+        ax0 = fig.add_axes([1, 0.35, 0.3, 0.3])
+        
+        #create wheel
+        AA = 1000
+        kx = np.fft.fftshift(np.fft.fftfreq(AA))
+        ky = np.fft.fftshift(np.fft.fftfreq(AA))
+        kya,kxa = np.meshgrid(ky,kx)
+        kra = (kya**2+kxa**2)**0.5
+        ktheta = np.arctan2(-kxa,kya)
+        ktheta = kra*np.exp(1j*ktheta)
+        
+        #convert to hsv
+        rgb = Complex2HSV(ktheta, 0, 0.4)
+        ind = kra > 0.4
+        rgb[ind] = [1,1,1]
+        
+        #plot
+        ax0.imshow(
+            rgb
+        )
+
+        #add axes
+        ax0.axhline(AA/2, 0, AA, color = 'k')
+        ax0.axvline(AA/2, 0, AA, color = 'k')
+        ax0.axis('off')
+
+        label_size = 16
+
+        ax0.text(AA, AA/2, 1, fontsize = label_size)
+        ax0.text(AA/2, 0, 'i', fontsize = label_size)
+        ax0.text(AA/2, AA, '-i', fontsize = label_size)
+        ax0.text(0, AA/2, -1, fontsize = label_size)
+
+    if returnfig == True: 
+        return fig, ax

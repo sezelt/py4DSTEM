@@ -4,12 +4,12 @@
 import numpy as np
 from numpy.linalg import lstsq
 from itertools import permutations
-from scipy.ndimage.filters import gaussian_filter
-from scipy.ndimage.morphology import binary_opening, binary_closing, binary_dilation, binary_erosion
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import binary_opening, binary_closing, binary_dilation, binary_erosion
 from skimage.measure import label
 from sklearn.decomposition import NMF
 
-from ...io import PointListArray
+from py4DSTEM.io import PointListArray
 
 
 class BraggVectorClassification(object):
@@ -726,7 +726,7 @@ def get_braggpeak_labels_by_scan_position(braggpeaks, Qx, Qy, max_dist=None):
         for Ry in range(braggpeaks.shape[1]):
             s = braggpeak_labels[Rx][Ry]
             pointlist = braggpeaks.get_pointlist(Rx,Ry)
-            for i in range(pointlist.length):
+            for i in range(len(pointlist.data)):
                 label = np.argmin(np.hypot(Qx-pointlist.data['qx'][i],Qy-pointlist.data['qy'][i]))
                 if max_dist is not None:
                     if np.hypot(Qx[label]-pointlist.data['qx'][i],Qy[label]-pointlist.data['qy'][i]) < max_dist:
