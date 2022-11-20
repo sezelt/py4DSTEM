@@ -431,9 +431,9 @@ def index_Bragg_peaks_from_orientation(
             )
 
     if len(matches) > 0:
-        return PointList(match_dtype, np.squeeze(np.array(matches))), sim_peaks
+        return PointList(np.squeeze(np.array(matches))), sim_peaks
     else:
-        return PointList(match_dtype), sim_peaks
+        return PointList(np.empty((0,),dtype=match_dtype)), sim_peaks
 
 
 def measure_disk_intensities(
