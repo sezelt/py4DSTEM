@@ -662,7 +662,7 @@ class Crystal:
             # foil_normal = orientation_matrix[:,2]
 
         # Rotate crystal into desired projection
-        g = orientation_matrix.T @ self.g_vec_all
+        g = orientation_matrix @ self.g_vec_all
 
 
         # Calculate excitation errors
@@ -863,7 +863,7 @@ class Crystal:
         return vec_lattice / np.linalg.norm(vec_lattice)
 
     def lattice_to_cartesian(self, vec_lattice):
-        vec_cartesian = self.lat_real.T @ vec_lattice
+        vec_cartesian = self.lat_real @ vec_lattice
         return vec_cartesian / np.linalg.norm(vec_cartesian)
 
     def hexagonal_to_lattice(self, vec_hexagonal):

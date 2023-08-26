@@ -555,15 +555,16 @@ def generate_CBED(
         zone_axis_cartesian=zone_axis_cartesian,
         proj_x_lattice=hkl_proj_x,
     )
-    ZA = np.array(zone_axis_rotation_matrix[:, 2]) / np.linalg.norm(
-        np.array(zone_axis_rotation_matrix[:, 2])
-    )
-    proj_x = zone_axis_rotation_matrix[:, 0] / np.linalg.norm(
-        zone_axis_rotation_matrix[:, 0]
-    )
-    proj_y = zone_axis_rotation_matrix[:, 1] / np.linalg.norm(
-        zone_axis_rotation_matrix[:, 1]
-    )
+    ZA = zone_axis_cartesian or (self.lat_inv @ zone_axis_lattice)
+    ZA /= np.linalg.norm(ZA)
+
+    proj_x = self.lat_inv @ hkl_proj_x
+    proj_x /= np.linalg.norm(proj_x)
+
+    proj_y = np.cross(ZA, proj_x)
+
+    print(f"x: {proj_x}, y:{proj_y}, ZA:{ZA}, x_hkl: {hkl_proj_x}")
+    # return 0,0
 
     # the foil normal should be the zone axis if unspecified
     if foil_normal_lattice is None:
@@ -688,7 +689,8 @@ def generate_CBED(
         if return_mask:
             return (DP[0], mask) if len(thickness) == 1 else (DP, mask)
         else:
-            return DP[0] if len(thickness) == 1 else DP
+            # return DP[0] if len(thickness) == 1 else DP
+            return DP, tZA, tx_pixels, ty_pixels
     else:
         if return_mask:
             return (DP[0], probe, mask) if len(thickness) == 1 else (DP, probe, mask)
