@@ -563,9 +563,6 @@ def generate_CBED(
 
     proj_y = np.cross(ZA, proj_x)
 
-    print(f"x: {proj_x}, y:{proj_y}, ZA:{ZA}, x_hkl: {hkl_proj_x}")
-    # return 0,0
-
     # the foil normal should be the zone axis if unspecified
     if foil_normal_lattice is None:
         foil_normal_lattice = zone_axis_lattice
@@ -689,8 +686,7 @@ def generate_CBED(
         if return_mask:
             return (DP[0], mask) if len(thickness) == 1 else (DP, mask)
         else:
-            # return DP[0] if len(thickness) == 1 else DP
-            return DP, tZA, tx_pixels, ty_pixels
+            return DP[0] if len(thickness) == 1 else DP
     else:
         if return_mask:
             return (DP[0], probe, mask) if len(thickness) == 1 else (DP, probe, mask)
