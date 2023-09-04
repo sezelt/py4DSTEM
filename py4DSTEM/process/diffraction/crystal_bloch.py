@@ -641,6 +641,7 @@ def generate_CBED(
         else:
             return (DP[0], probe) if len(thickness) == 1 else (DP, probe)
 
+
 def generate_Kikuchi(
     self,
     beams,
@@ -655,8 +656,7 @@ def generate_Kikuchi(
     dtype: np.dtype = np.float32,
     progress_bar: bool = True,
     two_beam_zone_axis_lattice: np.ndarray = None,
-)->np.ndarray:
-
+) -> np.ndarray:
     hkl_proj_x = _get_proj_x_from_beams(beams, two_beam_zone_axis_lattice)
 
     # get unit vector in zone axis direction and projected x and y Cartesian directions:
@@ -669,30 +669,32 @@ def generate_Kikuchi(
     proj_y = np.cross(ZA, proj_x)
 
     # calculate pattern size
-    N = DP_size_pixels or (DP_size_inv_A*2 // pixel_size_inv_A)
+    N = DP_size_pixels or (DP_size_inv_A * 2 // pixel_size_inv_A)
     if N is None:
-        raise ValueError("Pattern size must specified with DP_size_inv_A or DP_size_pixels...")
+        raise ValueError(
+            "Pattern size must specified with DP_size_inv_A or DP_size_pixels..."
+        )
 
     # Tilt at the edges of the pattern
-    tiltmax = (N/2) * pixel_size_inv_A * self.wavelength
+    tiltmax = (N / 2) * pixel_size_inv_A * self.wavelength
 
     tilt_x, tilt_y = np.meshgrid(
-        np.linspace(-tiltmax,tiltmax,num=N),
-        np.linspace(-tiltmax,tiltmax,num=N),
-        indexing='xy',
+        np.linspace(-tiltmax, tiltmax, num=N),
+        np.linspace(-tiltmax, tiltmax, num=N),
+        indexing="xy",
     )
 
     # get the coordinates of each pixel
-    tZA = ZA[None,None,:] - tilt_x[:,:,None] * proj_x - tilt_y[:,:,None] * proj_y
+    tZA = ZA[None, None, :] - tilt_x[:, :, None] * proj_x - tilt_y[:, :, None] * proj_y
 
     # allocate array for pattern
     kikuchi = np.zeros((len(thickness),) + tZA.shape[:2], dtype=dtype)
 
-    for rx,ry in py4DSTEM.tqdmnd(*tZA.shape[:2], disable=not progress_bar):
+    for rx, ry in py4DSTEM.tqdmnd(*tZA.shape[:2], disable=not progress_bar):
         _, psi_0, (C, _, gamma, _) = self.generate_dynamical_diffraction_pattern(
-            beams=beams, 
-            thickness=thickness, 
-            zone_axis_cartesian=tZA[rx,ry],
+            beams=beams,
+            thickness=thickness,
+            zone_axis_cartesian=tZA[rx, ry],
             return_Smatrix=True,
             return_eigenvectors=True,
             foil_normal_cartesian=ZA,
@@ -700,9 +702,15 @@ def generate_Kikuchi(
 
         # compute absorption at this orientation
         C0 = C.T @ psi_0
-        kikuchi[:,rx,ry] = 1.0 - np.abs([np.sum(C0**2 * np.exp(-4.0 * np.pi * np.imag(gamma) * z)) for z in thickness])
+        kikuchi[:, rx, ry] = 1.0 - np.abs(
+            [
+                np.sum(C0**2 * np.exp(-4.0 * np.pi * np.imag(gamma) * z))
+                for z in thickness
+            ]
+        )
 
     return np.squeeze(kikuchi)
+
 
 def _get_CBED_coordinates(
     self,
@@ -711,8 +719,8 @@ def _get_CBED_coordinates(
     pixel_size_inv_A: float,
     zone_axis_lattice: np.ndarray = None,
     zone_axis_cartesian: np.ndarray = None,
-    two_beam_zone_axis_lattice: np.ndarray= None,
-    ):
+    two_beam_zone_axis_lattice: np.ndarray = None,
+):
     """
     Generate list of orientations within the aperture for CBED
     """
@@ -754,7 +762,7 @@ def _get_CBED_coordinates(
     return tZA, tx_pixels, ty_pixels, alpha_pix
 
 
-def _get_proj_x_from_beams(beams:PointList, two_beam_zone_axis_lattice:np.ndarray):
+def _get_proj_x_from_beams(beams: PointList, two_beam_zone_axis_lattice: np.ndarray):
     # Determine indices of the projected x direction in a list of beams
 
     # figure out the projected x and y directions from the beams input
