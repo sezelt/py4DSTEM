@@ -61,6 +61,8 @@ class Crystal:
         generate_dynamical_diffraction_pattern,
         generate_CBED,
         calculate_dynamical_structure_factors,
+        generate_Kikuchi,
+        _get_CBED_coordinates,
     )
 
     def __init__(

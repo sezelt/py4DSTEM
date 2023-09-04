@@ -524,72 +524,20 @@ def generate_CBED(
         If return_probe is True: will return a tuple (<CBED/LACBED object>, Probe)
     """
 
-    alpha_rad = alpha_mrad / 1000.0
-
-    # figure out the projected x and y directions from the beams input
-    hkl = np.vstack((beams.data["h"], beams.data["k"], beams.data["l"])).T.astype(
-        np.float64
-    )
-    qxy = np.vstack((beams.data["qx"], beams.data["qy"])).T.astype(np.float64)
-
-    # If there are only two beams, augment the list with a third perpendicular spot
-    if qxy.shape[0] == 2:
-        assert (
-            two_beam_zone_axis_lattice is not None
-        ), "When only two beams are present, two_beam_zone_axis_lattice must be specified."
-        hkl_reflection = hkl[1] if np.all(qxy[0] == 0.0) else hkl[0]
-        qxy_reflection = qxy[1] if np.all(qxy[0] == 0.0) else qxy[0]
-        orthogonal_spot = np.cross(two_beam_zone_axis_lattice, hkl_reflection)
-        hkl_augmented = np.vstack((hkl, orthogonal_spot))
-        qxy_augmented = np.vstack((qxy, np.flipud(qxy_reflection)))
-        proj = np.linalg.lstsq(qxy_augmented, hkl_augmented, rcond=-1)[0]
-        hkl_proj_x = proj[0] / np.linalg.norm(proj[0])
-    # Otherwise calculate them based on the pattern
-    else:
-        proj = np.linalg.lstsq(qxy, hkl, rcond=-1)[0]
-        hkl_proj_x = proj[0] / np.linalg.norm(proj[0])
-
-    # get unit vector in zone axis direction and projected x and y Cartesian directions:
-    zone_axis_rotation_matrix = self.parse_orientation(
+    tZA, tx_pixels, ty_pixels, alpha_pix = self._get_CBED_coordinates(
+        beams=beams,
+        alpha_mrad=alpha_mrad,
+        pixel_size_inv_A=pixel_size_inv_A,
         zone_axis_lattice=zone_axis_lattice,
         zone_axis_cartesian=zone_axis_cartesian,
-        proj_x_lattice=hkl_proj_x,
+        two_beam_zone_axis_lattice=two_beam_zone_axis_lattice,
     )
-    ZA = zone_axis_cartesian or (self.lat_inv @ zone_axis_lattice)
-    ZA /= np.linalg.norm(ZA)
-
-    proj_x = self.lat_inv @ hkl_proj_x
-    proj_x /= np.linalg.norm(proj_x)
-
-    proj_y = np.cross(ZA, proj_x)
 
     # the foil normal should be the zone axis if unspecified
     if foil_normal_lattice is None:
         foil_normal_lattice = zone_axis_lattice
     if foil_normal_cartesian is None:
         foil_normal_cartesian = zone_axis_cartesian
-
-    # TODO: refine pixel size to center reflections on pixels
-
-    # Generate list of plane waves inside aperture
-    alpha_pix = np.round(
-        alpha_rad / self.wavelength / pixel_size_inv_A
-    )  # radius of aperture in pixels
-
-    tx_pixels, ty_pixels = np.meshgrid(
-        np.arange(-alpha_pix, alpha_pix + 1), np.arange(-alpha_pix, alpha_pix + 1)
-    )  # plane waves in pixel units
-
-    # remove those outside circular aperture
-    keep_mask = np.hypot(tx_pixels, ty_pixels) < alpha_pix
-    tx_pixels = tx_pixels[keep_mask].astype(np.intp)
-    ty_pixels = ty_pixels[keep_mask].astype(np.intp)
-
-    tx_rad = tx_pixels / alpha_pix * alpha_rad
-    ty_rad = ty_pixels / alpha_pix * alpha_rad
-
-    # calculate plane waves as zone axes using small angle approximation for tilting
-    tZA = ZA - (tx_rad[:, None] * proj_x) - (ty_rad[:, None] * proj_y)
 
     if LACBED:
         # In LACBED mode, the default DP size is the same as one diffraction disk (2ɑ)
@@ -692,3 +640,144 @@ def generate_CBED(
             return (DP[0], probe, mask) if len(thickness) == 1 else (DP, probe, mask)
         else:
             return (DP[0], probe) if len(thickness) == 1 else (DP, probe)
+
+def generate_Kikuchi(
+    self,
+    beams,
+    thickness: Union[float, list, tuple, np.ndarray],
+    pixel_size_inv_A: float,
+    DP_size_inv_A: Optional[float] = None,
+    DP_size_pixels: Optional[float] = None,
+    zone_axis_lattice: np.ndarray = None,
+    zone_axis_cartesian: np.ndarray = None,
+    foil_normal_lattice: np.ndarray = None,
+    foil_normal_cartesian: np.ndarray = None,
+    dtype: np.dtype = np.float32,
+    progress_bar: bool = True,
+    two_beam_zone_axis_lattice: np.ndarray = None,
+)->np.ndarray:
+
+    hkl_proj_x = _get_proj_x_from_beams(beams, two_beam_zone_axis_lattice)
+
+    # get unit vector in zone axis direction and projected x and y Cartesian directions:
+    ZA = zone_axis_cartesian or (self.lat_inv @ zone_axis_lattice)
+    ZA /= np.linalg.norm(ZA)
+
+    proj_x = self.lat_inv @ hkl_proj_x
+    proj_x /= np.linalg.norm(proj_x)
+
+    proj_y = np.cross(ZA, proj_x)
+
+    # calculate pattern size
+    N = DP_size_pixels or (DP_size_inv_A*2 // pixel_size_inv_A)
+    if N is None:
+        raise ValueError("Pattern size must specified with DP_size_inv_A or DP_size_pixels...")
+
+    # Tilt at the edges of the pattern
+    tiltmax = (N/2) * pixel_size_inv_A * self.wavelength
+
+    tilt_x, tilt_y = np.meshgrid(
+        np.linspace(-tiltmax,tiltmax,num=N),
+        np.linspace(-tiltmax,tiltmax,num=N),
+        indexing='xy',
+    )
+
+    # get the coordinates of each pixel
+    tZA = ZA[None,None,:] - tilt_x[:,:,None] * proj_x - tilt_y[:,:,None] * proj_y
+
+    # allocate array for pattern
+    kikuchi = np.zeros((len(thickness),) + tZA.shape[:2], dtype=dtype)
+
+    for rx,ry in py4DSTEM.tqdmnd(*tZA.shape[:2], disable=not progress_bar):
+        _, psi_0, (C, _, gamma, _) = self.generate_dynamical_diffraction_pattern(
+            beams=beams, 
+            thickness=thickness, 
+            zone_axis_cartesian=tZA[rx,ry],
+            return_Smatrix=True,
+            return_eigenvectors=True,
+            foil_normal_cartesian=ZA,
+        )
+
+        # compute absorption at this orientation
+        C0 = C.T @ psi_0
+        kikuchi[:,rx,ry] = 1.0 - np.abs([np.sum(C0**2 * np.exp(-4.0 * np.pi * np.imag(gamma) * z)) for z in thickness])
+
+    return np.squeeze(kikuchi)
+
+def _get_CBED_coordinates(
+    self,
+    beams: PointList,
+    alpha_mrad: float,
+    pixel_size_inv_A: float,
+    zone_axis_lattice: np.ndarray = None,
+    zone_axis_cartesian: np.ndarray = None,
+    two_beam_zone_axis_lattice: np.ndarray= None,
+    ):
+    """
+    Generate list of orientations within the aperture for CBED
+    """
+    alpha_rad = alpha_mrad / 1000.0
+
+    hkl_proj_x = _get_proj_x_from_beams(beams, two_beam_zone_axis_lattice)
+
+    # get unit vector in zone axis direction and projected x and y Cartesian directions:
+    ZA = zone_axis_cartesian or (self.lat_inv @ zone_axis_lattice)
+    ZA /= np.linalg.norm(ZA)
+
+    proj_x = self.lat_inv @ hkl_proj_x
+    proj_x /= np.linalg.norm(proj_x)
+
+    proj_y = np.cross(ZA, proj_x)
+
+    # TODO: refine pixel size to center reflections on pixels
+
+    # Generate list of plane waves inside aperture
+    alpha_pix = np.round(
+        alpha_rad / self.wavelength / pixel_size_inv_A
+    )  # radius of aperture in pixels
+
+    tx_pixels, ty_pixels = np.meshgrid(
+        np.arange(-alpha_pix, alpha_pix + 1), np.arange(-alpha_pix, alpha_pix + 1)
+    )  # plane waves in pixel units
+
+    # remove those outside circular aperture
+    keep_mask = np.hypot(tx_pixels, ty_pixels) < alpha_pix
+    tx_pixels = tx_pixels[keep_mask].astype(np.intp)
+    ty_pixels = ty_pixels[keep_mask].astype(np.intp)
+
+    tx_rad = tx_pixels / alpha_pix * alpha_rad
+    ty_rad = ty_pixels / alpha_pix * alpha_rad
+
+    # calculate plane waves as zone axes using small angle approximation for tilting
+    tZA = ZA - (tx_rad[:, None] * proj_x) - (ty_rad[:, None] * proj_y)
+
+    return tZA, tx_pixels, ty_pixels, alpha_pix
+
+
+def _get_proj_x_from_beams(beams:PointList, two_beam_zone_axis_lattice:np.ndarray):
+    # Determine indices of the projected x direction in a list of beams
+
+    # figure out the projected x and y directions from the beams input
+    hkl = np.vstack((beams.data["h"], beams.data["k"], beams.data["l"])).T.astype(
+        np.float64
+    )
+    qxy = np.vstack((beams.data["qx"], beams.data["qy"])).T.astype(np.float64)
+
+    # If there are only two beams, augment the list with a third perpendicular spot
+    if qxy.shape[0] == 2:
+        assert (
+            two_beam_zone_axis_lattice is not None
+        ), "When only two beams are present, two_beam_zone_axis_lattice must be specified."
+        hkl_reflection = hkl[1] if np.all(qxy[0] == 0.0) else hkl[0]
+        qxy_reflection = qxy[1] if np.all(qxy[0] == 0.0) else qxy[0]
+        orthogonal_spot = np.cross(two_beam_zone_axis_lattice, hkl_reflection)
+        hkl_augmented = np.vstack((hkl, orthogonal_spot))
+        qxy_augmented = np.vstack((qxy, np.flipud(qxy_reflection)))
+        proj = np.linalg.lstsq(qxy_augmented, hkl_augmented, rcond=-1)[0]
+        hkl_proj_x = proj[0] / np.linalg.norm(proj[0])
+    # Otherwise calculate them based on the pattern
+    else:
+        proj = np.linalg.lstsq(qxy, hkl, rcond=-1)[0]
+        hkl_proj_x = proj[0] / np.linalg.norm(proj[0])
+
+    return hkl_proj_x
