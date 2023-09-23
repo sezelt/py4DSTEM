@@ -8,6 +8,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 
 from emdfile import PointList
+from py4DSTEM import tqdmnd
 from py4DSTEM.process.utils import electron_wavelength_angstrom, single_atom_scatter
 from py4DSTEM.process.diffraction.WK_scattering_factors import compute_WK_factor
 
@@ -644,7 +645,7 @@ def generate_CBED(
 
 def generate_Kikuchi(
     self,
-    beams,
+    beams: PointList,
     thickness: Union[float, list, tuple, np.ndarray],
     pixel_size_inv_A: float,
     DP_size_inv_A: Optional[float] = None,
@@ -669,7 +670,7 @@ def generate_Kikuchi(
     proj_y = np.cross(ZA, proj_x)
 
     # calculate pattern size
-    N = DP_size_pixels or (DP_size_inv_A * 2 // pixel_size_inv_A)
+    N = DP_size_pixels or int(DP_size_inv_A * 2 / pixel_size_inv_A)
     if N is None:
         raise ValueError(
             "Pattern size must specified with DP_size_inv_A or DP_size_pixels..."
@@ -681,17 +682,18 @@ def generate_Kikuchi(
     tilt_x, tilt_y = np.meshgrid(
         np.linspace(-tiltmax, tiltmax, num=N),
         np.linspace(-tiltmax, tiltmax, num=N),
-        indexing="xy",
+        indexing="ij",
     )
 
     # get the coordinates of each pixel
     tZA = ZA[None, None, :] - tilt_x[:, :, None] * proj_x - tilt_y[:, :, None] * proj_y
 
     # allocate array for pattern
+    thickness = np.atleast_1d(thickness)
     kikuchi = np.zeros((len(thickness),) + tZA.shape[:2], dtype=dtype)
 
-    for rx, ry in py4DSTEM.tqdmnd(*tZA.shape[:2], disable=not progress_bar):
-        _, psi_0, (C, _, gamma, _) = self.generate_dynamical_diffraction_pattern(
+    for rx, ry in tqdmnd(*tZA.shape[:2], disable=not progress_bar):
+        _, psi_0, (C, C_inv, gamma, _) = self.generate_dynamical_diffraction_pattern(
             beams=beams,
             thickness=thickness,
             zone_axis_cartesian=tZA[rx, ry],
@@ -701,7 +703,7 @@ def generate_Kikuchi(
         )
 
         # compute absorption at this orientation
-        C0 = C.T @ psi_0
+        C0 = C_inv @ psi_0
         kikuchi[:, rx, ry] = 1.0 - np.abs(
             [
                 np.sum(C0**2 * np.exp(-4.0 * np.pi * np.imag(gamma) * z))
