@@ -135,7 +135,7 @@ class Crystal:
             )
             self.cell = (a, b, c, alpha, beta, gamma)
         else:
-            raise Exception("Cell cannot contain " + np.size(cell) + " entries")
+            raise Exception("Cell cannot contain " + str(np.size(cell)) + " entries")
 
         # pymatgen flag
         if "pymatgen" in sys.modules:
@@ -263,6 +263,7 @@ class Crystal:
         else:
             return crystal_strained
 
+    @staticmethod
     def from_CIF(CIF, conventional_standard_structure=True):
         """
         Create a Crystal object from a CIF file, using pymatgen to import the CIF
@@ -285,6 +286,7 @@ class Crystal:
             structure, conventional_standard_structure=conventional_standard_structure
         )
 
+    @staticmethod
     def from_pymatgen_structure(
         structure=None,
         formula=None,
@@ -398,6 +400,7 @@ class Crystal:
 
         return Crystal(positions, numbers, cell)
 
+    @staticmethod
     def from_unitcell_parameters(
         latt_params,
         elements,
@@ -405,7 +408,6 @@ class Crystal:
         space_group=None,
         lattice_type="cubic",
         from_cartesian=False,
-        conventional_standard_structure=True,
     ):
         """
         Create a Crystal using pymatgen to generate unit cell manually from user inputs
@@ -420,8 +422,6 @@ class Crystal:
                                      pymatgen Structure.from_spacegroup function
                 lattice_type:        (string) type of crystal family: cubic, hexagonal, triclinic etc; default: 'cubic'
                 from_cartesian:      (bool) if True, positions will be considered as cartesian, default: False
-                conventional_standard_structure: (bool) if True, conventional standard unit cell will be returned
-                                     instead of the primitive unit cell pymatgen returns
         Returns:
                 Crystal object
 
