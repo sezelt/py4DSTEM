@@ -714,6 +714,59 @@ def generate_Kikuchi(
     return np.squeeze(kikuchi)
 
 
+def generate_Kikuchi_map(
+    self,
+    thickness,
+    zone_axis_range="auto",
+    angle_step_zone_axis=0.5,
+    k_max=2.5,
+    sigma_excitation_error=0.05,
+):
+    """
+    TODO: return results as a pointlist, which gets passed around for plotting
+    """
+
+    self.orientation_plan(
+        zone_axis_range=zone_axis_range,
+        angle_step_zone_axis=angle_step_zone_axis,
+        calculate_correlation_array=False,
+    )
+
+    thickness = np.atleast_1d(thickness)
+
+    kikuchi = np.zeros((len(thickness), self.orientation_vecs.shape[0]))
+
+    n_beams = np.zeros((self.orientation_vecs.shape[0],))
+
+    for i, vec in tqdm(enumerate(self.orientation_vecs), total=kikuchi.shape[1]):
+        beams = self.generate_diffraction_pattern(
+            zone_axis_lattice=vec,
+            sigma_excitation_error=sigma_excitation_error,
+            k_max=k_max,
+            # tol_intensity=0.0,
+        )
+        n_beams[i] = beams.data.shape[0]
+
+        _, psi_0, (C, C_inv, gamma, _) = self.generate_dynamical_diffraction_pattern(
+            beams=beams,
+            thickness=thickness,
+            zone_axis_lattice=vec,
+            return_Smatrix=True,
+            return_eigenvectors=True,
+        )
+
+        # compute absorption at this orientation
+        C0 = C_inv @ psi_0
+        kikuchi[:, i] = 1.0 - np.abs(
+            [
+                np.sum(C0**2 * np.exp(-4.0 * np.pi * np.imag(gamma) * z))
+                for z in thickness
+            ]
+        )
+
+    return kikuchi
+
+
 def _get_CBED_coordinates(
     self,
     beams: PointList,
@@ -791,3 +844,38 @@ def _get_proj_x_from_beams(beams: PointList, two_beam_zone_axis_lattice: np.ndar
         hkl_proj_x = proj[0] / np.linalg.norm(proj[0])
 
     return hkl_proj_x
+
+
+def _prune_vector_to_fundamental_wedge(
+    self,
+    vector,
+    fundamental_vectors,
+    prune_parallel=True,
+):
+    """
+    Given a list of vectors, return only those within (or on the boundary of) the
+    patch spanned by the fundamental_vectors. If prune_paralle is True, all directions
+    returned are unique.
+    """
+    vector = np.atleast_2d(vector)
+    handedness = np.sign(
+        np.cross(fundamental_vectors[0], fundamental_vectors[1])
+        @ fundamental_vectors[2]
+    )
+    reciprocal_zones = np.linalg.inv(fundamental_vectors)
+
+    keep = np.all(np.sign(vector @ reciprocal_zones) * handedness <= 0.0, axis=1)
+    vector = vector[keep]
+
+    vector_az = np.arctan2(vector[:, 1], vector[:, 0])
+    vector_el = np.arctan(vector[:, 2] / np.hypot(vector[:, 1], vector[:, 0]))
+    vector_azel = np.vstack((vector_az, vector_el)).T
+    _, keep = np.unique(np.round(vector_azel, 5), axis=0, return_index=True)
+    vector = vector[keep]
+
+    if prune_parallel:
+        vector_n = vector / np.linalg.norm(vector, axis=1)[:, None]
+        _, keep = np.unique(vector_n, axis=0, return_index=True)
+        vector = vector[keep]
+
+    return vector
