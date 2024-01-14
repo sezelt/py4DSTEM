@@ -296,6 +296,9 @@ class SingleslicePtychography(
         if self._positions_mask is not None:
             self._positions_mask = np.asarray(self._positions_mask, dtype="bool")
 
+
+        if "force_com_x" in kwargs.keys() or "force_com_y" in kwargs.keys():
+            force_com_shift = [kwargs.pop("force_com_x"), kwargs.pop('force_com_y')]
         # preprocess datacube
         (
             self._datacube,

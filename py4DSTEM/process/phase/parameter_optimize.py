@@ -173,7 +173,7 @@ class PtychographyOptimizer:
         num_evals = len(params_grid)
 
         error_metric = self._get_error_metric(error_metric)
-        pbar = tqdm(total=num_evals, desc="Searching parameters")
+        pbar = tqdm(total=num_evals, desc="Searching parameters", dynamic_ncols=True)
 
         def evaluation_callback(ptycho):
             if plot_reconstructed_objects or return_reconstructed_objects:
@@ -302,29 +302,33 @@ class PtychographyOptimizer:
         )
 
         # Make a progress bar
-        pbar = tqdm(total=n_calls, desc="Optimizing parameters")
+        pbar = tqdm(total=n_calls, desc="Optimizing parameters", dynamic_ncols=True)
 
         # We need to wrap the callback because if it returns a value
         # the optimizer breaks its loop
         def callback(*args, **kwargs):
             pbar.update(1)
 
-        self._skopt_result = gp_minimize(
-            self._optimization_function,
-            self._parameter_list,
-            n_calls=n_calls,
-            n_initial_points=n_initial_points,
-            x0=self._x0,
-            callback=callback,
-            **skopt_kwargs,
-        )
+        try:
+            self._skopt_result = gp_minimize(
+                self._optimization_function,
+                self._parameter_list,
+                n_calls=n_calls,
+                n_initial_points=n_initial_points,
+                x0=self._x0,
+                callback=callback,
+                **skopt_kwargs,
+            )
 
-        print("Optimized parameters:")
-        for p, x in zip(self._parameter_list, self._skopt_result.x):
-            print(f"{p.name}: {x}")
+            print("Optimized parameters:")
+            for p, x in zip(self._parameter_list, self._skopt_result.x):
+                print(f"{p.name}: {x}")
 
-        # Finish the tqdm progressbar so subsequent things behave nicely
-        pbar.close()
+            # Finish the tqdm progressbar so subsequent things behave nicely
+            pbar.close()
+        except KeyboardInterrupt:
+            # close the pbar gracefully on interrupt
+            pbar.close()
 
         return self
 
