@@ -244,13 +244,15 @@ class MultislicePtychography(
         force_com_rotation: float = None,
         force_com_transpose: float = None,
         force_com_shifts: float = None,
+        vectorized_com_calculation: bool = True,
         force_scan_sampling: float = None,
         force_angular_sampling: float = None,
         force_reciprocal_sampling: float = None,
         object_fov_mask: np.ndarray = None,
         crop_patterns: bool = False,
         device: str = None,
-        clear_fft_cache: bool = True,
+        clear_fft_cache: bool = None,
+        max_batch_size: int = None,
         **kwargs,
     ):
         """
@@ -302,6 +304,8 @@ class MultislicePtychography(
             Amplitudes come from diffraction patterns shifted with
             the CoM in the upper left corner for each probe unless
             shift is overwritten.
+        vectorized_com_calculation: bool, optional
+            If True (default), the memory-intensive CoM calculation is vectorized
         force_scan_sampling: float, optional
             Override DataCube real space scan pixel size calibrations, in Angstrom
         force_angular_sampling: float, optional
@@ -317,6 +321,8 @@ class MultislicePtychography(
             If not None, overwrites self._device to set device preprocess will be perfomed on.
         clear_fft_cache: bool, optional
             If True, and device = 'gpu', clears the cached fft plan at the end of function calls
+        max_batch_size: int, optional
+            Max number of probes to use at once in computing probe overlaps
 
         Returns
         --------
@@ -395,6 +401,7 @@ class MultislicePtychography(
             dp_mask=self._dp_mask,
             fit_function=fit_function,
             com_shifts=force_com_shifts,
+            vectorized_calculation=vectorized_com_calculation,
         )
 
         # estimate rotation / transpose
@@ -418,18 +425,21 @@ class MultislicePtychography(
         )
 
         # explicitly transfer arrays to storage
-        self._com_measured_x = copy_to_device(self._com_measured_x, storage)
-        self._com_measured_y = copy_to_device(self._com_measured_y, storage)
-        self._com_fitted_x = copy_to_device(self._com_fitted_x, storage)
-        self._com_fitted_y = copy_to_device(self._com_fitted_y, storage)
-        self._com_normalized_x = copy_to_device(self._com_normalized_x, storage)
-        self._com_normalized_y = copy_to_device(self._com_normalized_y, storage)
-        self._com_x = copy_to_device(self._com_x, storage)
-        self._com_y = copy_to_device(self._com_y, storage)
+        attrs = [
+            "_com_measured_x",
+            "_com_measured_y",
+            "_com_fitted_x",
+            "_com_fitted_y",
+            "_com_normalized_x",
+            "_com_normalized_y",
+            "_com_x",
+            "_com_y",
+        ]
+        self.copy_attributes_to_device(attrs, storage)
 
         # corner-center amplitudes
         (
-            _amplitudes,
+            self._amplitudes,
             self._mean_diffraction_intensity,
             self._crop_mask,
         ) = self._normalize_diffraction_intensities(
@@ -441,7 +451,7 @@ class MultislicePtychography(
         )
 
         # explicitly transfer arrays to storage
-        self._amplitudes = copy_to_device(_amplitudes, storage)
+        self._amplitudes = copy_to_device(self._amplitudes, storage)
         del _intensities
 
         self._num_diffraction_patterns = self._amplitudes.shape[0]
@@ -476,7 +486,9 @@ class MultislicePtychography(
         self._object_shape = self._object.shape[-2:]
 
         # center probe positions
-        self._positions_px = xp_storage.asarray(self._positions_px, dtype=xp.float32)
+        self._positions_px = xp_storage.asarray(
+            self._positions_px, dtype=xp_storage.float32
+        )
         self._positions_px_initial_com = self._positions_px.mean(0)
         self._positions_px -= (
             self._positions_px_initial_com - xp_storage.array(self._object_shape) / 2
@@ -520,13 +532,23 @@ class MultislicePtychography(
         )
 
         # overlaps
-        positions_px_fractional = self._positions_px - xp_storage.round(
-            self._positions_px
-        )
-        shifted_probes = fft_shift(self._probe, positions_px_fractional, xp)
-        probe_overlap = self._sum_overlapping_patches_bincounts(
-            xp.abs(shifted_probes) ** 2, self._positions_px
-        )
+        if max_batch_size is None:
+            max_batch_size = self._num_diffraction_patterns
+
+        probe_overlap = xp.zeros(self._object_shape, dtype=xp.float32)
+
+        for start, end in generate_batches(
+            self._num_diffraction_patterns, max_batch=max_batch_size
+        ):
+            # batch indices
+            positions_px = self._positions_px[start:end]
+            positions_px_fractional = positions_px - xp_storage.round(positions_px)
+
+            shifted_probes = fft_shift(self._probe, positions_px_fractional, xp)
+            probe_overlap += self._sum_overlapping_patches_bincounts(
+                xp.abs(shifted_probes) ** 2, positions_px
+            )
+
         del shifted_probes
 
         if object_fov_mask is None:
@@ -631,7 +653,7 @@ class MultislicePtychography(
             fig.tight_layout()
 
         self._preprocessed = True
-        self.clear_device_mem(device, self._clear_fft_cache)
+        self.clear_device_mem(self._device, self._clear_fft_cache)
 
         return self
 
@@ -668,6 +690,7 @@ class MultislicePtychography(
         fit_probe_aberrations_max_angular_order: int = 4,
         fit_probe_aberrations_max_radial_order: int = 4,
         fit_probe_aberrations_remove_initial: bool = False,
+        fit_probe_aberrations_using_scikit_image: bool = True,
         butterworth_filter_iter: int = np.inf,
         q_lowpass: float = None,
         q_highpass: float = None,
@@ -690,7 +713,7 @@ class MultislicePtychography(
         progress_bar: bool = True,
         reset: bool = None,
         device: str = None,
-        clear_fft_cache: bool = True,
+        clear_fft_cache: bool = None,
     ):
         """
         Ptychographic reconstruction main method.
@@ -765,6 +788,10 @@ class MultislicePtychography(
             Max radial order of probe aberrations basis functions
         fit_probe_aberrations_remove_initial: bool
             If true, initial probe aberrations are removed before fitting
+        fit_probe_aberrations_using_scikit_image: bool
+            If true, the necessary phase unwrapping is performed using scikit-image. This is more stable, but occasionally leads
+            to a documented bug where the kernel hangs..
+            If false, a poisson-based solver is used for phase unwrapping. This won't hang, but tends to underestimate aberrations.
         butterworth_filter_iter: int, optional
             Number of iterations to run using high-pass butteworth filter
         q_lowpass: float
@@ -998,6 +1025,7 @@ class MultislicePtychography(
                 fit_probe_aberrations_max_angular_order=fit_probe_aberrations_max_angular_order,
                 fit_probe_aberrations_max_radial_order=fit_probe_aberrations_max_radial_order,
                 fit_probe_aberrations_remove_initial=fit_probe_aberrations_remove_initial,
+                fit_probe_aberrations_using_scikit_image=fit_probe_aberrations_using_scikit_image,
                 fix_probe_aperture=a0 < fix_probe_aperture_iter,
                 initial_probe_aperture=self._probe_initial_aperture,
                 fix_positions=a0 < fix_positions_iter,
@@ -1046,6 +1074,6 @@ class MultislicePtychography(
         if not use_projection_scheme:
             self._exit_waves = None
 
-        self.clear_device_mem(device, self._clear_fft_cache)
+        self.clear_device_mem(self._device, self._clear_fft_cache)
 
         return self

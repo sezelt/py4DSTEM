@@ -178,7 +178,10 @@ class PtychographyOptimizer:
         def evaluation_callback(ptycho):
             if plot_reconstructed_objects or return_reconstructed_objects:
                 pbar.update(1)
-                return (ptycho.object_cropped, error_metric(ptycho))
+                return (
+                    ptycho._return_projected_cropped_potential(),
+                    error_metric(ptycho),
+                )
             else:
                 pbar.update(1)
                 error_metric(ptycho)

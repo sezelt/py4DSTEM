@@ -1038,6 +1038,7 @@ class ProbeConstraintsMixin:
         max_angular_order,
         max_radial_order,
         remove_initial_probe_aberrations,
+        use_scikit_image,
     ):
         """
         Ptychographic probe smoothing constraint.
@@ -1075,6 +1076,7 @@ class ProbeConstraintsMixin:
             energy,
             max_angular_order,
             max_radial_order,
+            use_scikit_image,
             xp=xp,
         )
 
@@ -1094,6 +1096,7 @@ class ProbeConstraintsMixin:
         fit_probe_aberrations_max_angular_order,
         fit_probe_aberrations_max_radial_order,
         fit_probe_aberrations_remove_initial,
+        fit_probe_aberrations_using_scikit_image,
         fix_probe_aperture,
         initial_probe_aperture,
         constrain_probe_fourier_amplitude,
@@ -1117,6 +1120,7 @@ class ProbeConstraintsMixin:
                 fit_probe_aberrations_max_angular_order,
                 fit_probe_aberrations_max_radial_order,
                 fit_probe_aberrations_remove_initial,
+                fit_probe_aberrations_using_scikit_image,
             )
 
         # Fourier amplitude (aperture) constraints
@@ -1214,11 +1218,12 @@ class ProbeMixedConstraintsMixin:
     def _probe_constraints(
         self,
         current_probe,
-        fix_com,
+        fix_probe_com,
         fit_probe_aberrations,
         fit_probe_aberrations_max_angular_order,
         fit_probe_aberrations_max_radial_order,
         fit_probe_aberrations_remove_initial,
+        fit_probe_aberrations_using_scikit_image,
         fix_probe_aperture,
         initial_probe_aperture,
         constrain_probe_fourier_amplitude,
@@ -1233,7 +1238,7 @@ class ProbeMixedConstraintsMixin:
         """ProbeMixedConstraints wrapper function"""
 
         # CoM corner-centering
-        if fix_com:
+        if fix_probe_com:
             current_probe = self._probe_center_of_mass_constraint(current_probe)
 
         # Fourier phase (aberrations) fitting
@@ -1244,6 +1249,7 @@ class ProbeMixedConstraintsMixin:
                     fit_probe_aberrations_max_angular_order,
                     fit_probe_aberrations_max_radial_order,
                     fit_probe_aberrations_remove_initial,
+                    fit_probe_aberrations_using_scikit_image,
                 )
 
         # Fourier amplitude (aperture) constraints

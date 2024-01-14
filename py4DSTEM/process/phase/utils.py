@@ -9,8 +9,6 @@ from scipy.optimize import curve_fit
 
 try:
     import cupy as cp
-    from cupyx.scipy.fft import dctn as dctn_cp
-    from cupyx.scipy.fft import idctn as idctn_cp
     from cupyx.scipy.ndimage import zoom as zoom_cp
 
     get_array_module = cp.get_array_module
@@ -24,6 +22,7 @@ except (ImportError, ModuleNotFoundError):
 from py4DSTEM.process.utils import get_CoM
 from py4DSTEM.process.utils.cross_correlate import align_and_shift_images
 from py4DSTEM.process.utils.utils import electron_wavelength_angstrom
+from skimage.restoration import unwrap_phase
 
 # fmt: off
 
@@ -1578,6 +1577,121 @@ def aberrations_basis_function(
     return aberrations_basis, aberrations_mn
 
 
+def interleave_ndarray_symmetrically(array_nd, axis, xp=np):
+    """[a,b,c,d,e,f] -> [a,c,e,f,d,b]"""
+    array_shape = np.array(array_nd.shape)
+    d = array_nd.ndim
+    n = array_shape[axis]
+
+    array = xp.empty_like(array_nd)
+    array[array_slice(axis, d, None, (n - 1) // 2 + 1)] = array_nd[
+        array_slice(axis, d, None, None, 2)
+    ]
+
+    if n % 2:  # odd
+        array[array_slice(axis, d, (n - 1) // 2 + 1, None)] = array_nd[
+            array_slice(axis, d, -2, None, -2)
+        ]
+    else:  # even
+        array[array_slice(axis, d, (n - 1) // 2 + 1, None)] = array_nd[
+            array_slice(axis, d, None, None, -2)
+        ]
+
+    return array
+
+
+def return_exp_factors(size, ndim, axis, xp=np):
+    none_axes = [None] * ndim
+    none_axes[axis] = slice(None)
+    exp_factors = 2 * xp.exp(-1j * np.pi * xp.arange(size) / (2 * size))
+    return exp_factors[tuple(none_axes)]
+
+
+def dct_II_using_FFT_base(array_nd, xp=np):
+    """FFT-based DCT-II"""
+    d = array_nd.ndim
+
+    for axis in range(d):
+        n = array_nd.shape[axis]
+        interleaved_array = interleave_ndarray_symmetrically(array_nd, axis=axis, xp=xp)
+        exp_factors = return_exp_factors(n, d, axis, xp)
+        interleaved_array = xp.fft.fft(interleaved_array, axis=axis)
+        interleaved_array *= exp_factors
+        array_nd = interleaved_array.real
+
+    return array_nd
+
+
+def dct_II_using_FFT(array_nd, xp=np):
+    if xp.iscomplexobj(array_nd):
+        real = dct_II_using_FFT_base(array_nd.real, xp=xp)
+        imag = dct_II_using_FFT_base(array_nd.imag, xp=xp)
+        return real + 1j * imag
+    else:
+        return dct_II_using_FFT_base(array_nd, xp=xp)
+
+
+def interleave_ndarray_symmetrically_inverse(array_nd, axis, xp=np):
+    """[a,c,e,f,d,b] -> [a,b,c,d,e,f]"""
+    array_shape = np.array(array_nd.shape)
+    d = array_nd.ndim
+    n = array_shape[axis]
+
+    array = xp.empty_like(array_nd)
+    array[array_slice(axis, d, None, None, 2)] = array_nd[
+        array_slice(axis, d, None, (n - 1) // 2 + 1)
+    ]
+
+    if n % 2:  # odd
+        array[array_slice(axis, d, -2, None, -2)] = array_nd[
+            array_slice(axis, d, (n - 1) // 2 + 1, None)
+        ]
+    else:  # even
+        array[array_slice(axis, d, None, None, -2)] = array_nd[
+            array_slice(axis, d, (n - 1) // 2 + 1, None)
+        ]
+
+    return array
+
+
+def return_exp_factors_inverse(size, ndim, axis, xp=np):
+    none_axes = [None] * ndim
+    none_axes[axis] = slice(None)
+    exp_factors = xp.exp(1j * np.pi * xp.arange(size) / (2 * size)) / 2
+    return exp_factors[tuple(none_axes)]
+
+
+def idct_II_using_FFT_base(array_nd, xp=np):
+    """FFT-based IDCT-II"""
+    d = array_nd.ndim
+
+    for axis in range(d):
+        n = array_nd.shape[axis]
+        reversed_array = xp.roll(
+            array_nd[array_slice(axis, d, None, None, -1)], 1, axis=axis
+        )  # C(N-k)
+        reversed_array[array_slice(axis, d, 0, 1)] = 0  # set C(N) = 0
+
+        interleaved_array = array_nd - 1j * reversed_array
+        exp_factors = return_exp_factors_inverse(n, d, axis, xp)
+        interleaved_array *= exp_factors
+
+        array_nd = xp.fft.ifft(interleaved_array, axis=axis).real
+        array_nd = interleave_ndarray_symmetrically_inverse(array_nd, axis=axis, xp=xp)
+
+    return array_nd
+
+
+def idct_II_using_FFT(array_nd, xp=np):
+    """FFT-based IDCT-II"""
+    if xp.iscomplexobj(array_nd):
+        real = idct_II_using_FFT_base(array_nd.real, xp=xp)
+        imag = idct_II_using_FFT_base(array_nd.imag, xp=xp)
+        return real + 1j * imag
+    else:
+        return idct_II_using_FFT_base(array_nd, xp=xp)
+
+
 def preconditioned_laplacian_neumann_2D(shape, xp=np):
     """DCT eigenvalues"""
     n, m = shape
@@ -1596,15 +1710,14 @@ def preconditioned_poisson_solver_neumann_2D(rhs, gauge=None, xp=np):
         gauge = xp.mean(rhs)
 
     if xp is np:
-        dctn_xp = dctn
-        idctn_xp = idctn
+        fft_rhs = dctn(rhs, type=2)
+        fft_rhs[0, 0] = gauge  # gauge invariance
+        sol = idctn(fft_rhs / op, type=2).real
     else:
-        dctn_xp = dctn_cp
-        idctn_xp = idctn_cp
+        fft_rhs = dct_II_using_FFT(rhs, xp)
+        fft_rhs[0, 0] = gauge  # gauge invariance
+        sol = idct_II_using_FFT(fft_rhs / op, xp)
 
-    fft_rhs = dctn_xp(rhs, type=2)
-    fft_rhs[0, 0] = gauge  # gauge invariance
-    sol = idctn_xp(fft_rhs / op, type=2).real
     return sol
 
 
@@ -1643,24 +1756,47 @@ def unwrap_phase_2d(array, weights=None, gauge=None, corner_centered=True, xp=np
     return unwrapped_array
 
 
+def unwrap_phase_2d_skimage(array, corner_centered=True, xp=np):
+    if xp is np:
+        array = array.astype(np.float64)
+        unwrapped_array = unwrap_phase(array, wrap_around=corner_centered).astype(
+            xp.float32
+        )
+    else:
+        array = xp.asnumpy(array).astype(np.float64)
+        unwrapped_array = unwrap_phase(array, wrap_around=corner_centered)
+        unwrapped_array = xp.asarray(unwrapped_array).astype(xp.float32)
+
+    return unwrapped_array
+
+
 def fit_aberration_surface(
     complex_probe,
     probe_sampling,
     energy,
     max_angular_order,
     max_radial_order,
+    use_scikit_image,
     xp=np,
 ):
     """ """
     probe_amp = xp.abs(complex_probe)
     probe_angle = -xp.angle(complex_probe)
 
-    unwrapped_angle = unwrap_phase_2d(
-        probe_angle,
-        weights=probe_amp,
-        corner_centered=True,
-        xp=xp,
-    )
+    if use_scikit_image:
+        unwrapped_angle = unwrap_phase_2d_skimage(
+            probe_angle,
+            corner_centered=True,
+            xp=xp,
+        )
+
+    else:
+        unwrapped_angle = unwrap_phase_2d(
+            probe_angle,
+            weights=probe_amp,
+            corner_centered=True,
+            xp=xp,
+        )
 
     raveled_basis, _ = aberrations_basis_function(
         complex_probe.shape,
