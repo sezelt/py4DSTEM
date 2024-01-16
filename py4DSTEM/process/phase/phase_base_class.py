@@ -644,7 +644,7 @@ class PhaseReconstruction(Custom):
                             f"not {dp_mask.shape}"
                         )
                     )
-                    dp_mask = xp.asarray(dp_mask, dtype=xp.float32)
+                dp_mask = xp.asarray(dp_mask, dtype=xp.float32)
 
             # Coordinates
             kx = xp.arange(intensities.shape[-2], dtype=xp.float32)
