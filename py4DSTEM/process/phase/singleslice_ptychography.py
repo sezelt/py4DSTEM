@@ -304,7 +304,7 @@ class SingleslicePtychography(
 
 
         if "force_com_x" in kwargs.keys() or "force_com_y" in kwargs.keys():
-            force_com_shift = [kwargs.pop("force_com_x"), kwargs.pop('force_com_y')]
+            force_com_shifts = [kwargs.pop("force_com_x"), kwargs.pop('force_com_y')]
         # preprocess datacube
         (
             self._datacube,
