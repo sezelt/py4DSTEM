@@ -8,16 +8,19 @@ from typing import Mapping, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pylops
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import ImageGrid, make_axes_locatable
 from py4DSTEM.visualize.vis_special import Complex2RGB, add_colorbar_arg, show_complex
 
 try:
     import cupy as cp
-except ImportError:
+except (ModuleNotFoundError, ImportError):
     cp = None
+    import os
 
+    # make sure pylops doesn't try to use cupy
+    os.environ["CUPY_PYLOPS"] = "0"
+import pylops  # this must follow the exception
 from emdfile import Custom, tqdmnd
 from py4DSTEM import DataCube
 from py4DSTEM.process.phase.iterative_base_class import PtychographicReconstruction
@@ -216,13 +219,6 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
             raise ValueError(
                 f"object_type must be either 'potential' or 'complex', not {object_type}"
             )
-
-        if positions_mask is not None and positions_mask.dtype != "bool":
-            warnings.warn(
-                ("`positions_mask` converted to `bool` array"),
-                UserWarning,
-            )
-            positions_mask = np.asarray(positions_mask, dtype="bool")
 
         self.set_save_defaults()
 
@@ -439,6 +435,13 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
                     "Please run ptycho.attach_datacube(DataCube) first."
                 )
             )
+
+        if self._positions_mask is not None and self._positions_mask.dtype != "bool":
+            warnings.warn(
+                ("`positions_mask` converted to `bool` array"),
+                UserWarning,
+            )
+            self._positions_mask = np.asarray(self._positions_mask, dtype="bool")
 
         (
             self._datacube,
@@ -2544,6 +2547,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         plot_convergence: bool,
         plot_probe: bool,
         plot_fourier_probe: bool,
+        remove_initial_probe_aberrations: bool,
         padding: int,
         **kwargs,
     ):
@@ -2562,6 +2566,8 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
             If true, the reconstructed probe intensity is also displayed
         plot_fourier_probe: bool, optional
             If true, the reconstructed complex Fourier probe is displayed
+        remove_initial_probe_aberrations: bool, optional
+            If true, when plotting fourier probe, removes initial probe
         padding : int, optional
             Pixels to pad by post rotating-cropping object
 
@@ -2569,10 +2575,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         figsize = kwargs.pop("figsize", (8, 5))
         cmap = kwargs.pop("cmap", "magma")
 
-        if plot_fourier_probe:
-            chroma_boost = kwargs.pop("chroma_boost", 2)
-        else:
-            chroma_boost = kwargs.pop("chroma_boost", 1)
+        chroma_boost = kwargs.pop("chroma_boost", 1)
 
         if self._object_type == "complex":
             obj = np.angle(self.object)
@@ -2667,9 +2670,16 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
 
             ax = fig.add_subplot(spec[0, 1])
             if plot_fourier_probe:
+                if remove_initial_probe_aberrations:
+                    probe_array = self.probe_fourier_residual[0]
+                else:
+                    probe_array = self.probe_fourier[0]
+
                 probe_array = Complex2RGB(
-                    self.probe_fourier[0], chroma_boost=chroma_boost
+                    probe_array,
+                    chroma_boost=chroma_boost,
                 )
+
                 ax.set_title("Reconstructed Fourier probe[0]")
                 ax.set_ylabel("kx [mrad]")
                 ax.set_xlabel("ky [mrad]")
@@ -2735,6 +2745,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         plot_convergence: bool,
         plot_probe: bool,
         plot_fourier_probe: bool,
+        remove_initial_probe_aberrations: bool,
         iterations_grid: Tuple[int, int],
         padding: int,
         **kwargs,
@@ -2756,6 +2767,9 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
             If true, the reconstructed probe intensity is also displayed
         plot_fourier_probe: bool, optional
             If true, the reconstructed complex Fourier probe is displayed
+        remove_initial_probe_aberrations: bool, optional
+            If true, when plotting fourier probe, removes initial probe
+            to visualize changes
         padding : int, optional
             Pixels to pad by post rotating-cropping object
         """
@@ -2798,10 +2812,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         figsize = kwargs.pop("figsize", auto_figsize)
         cmap = kwargs.pop("cmap", "magma")
 
-        if plot_fourier_probe:
-            chroma_boost = kwargs.pop("chroma_boost", 2)
-        else:
-            chroma_boost = kwargs.pop("chroma_boost", 1)
+        chroma_boost = kwargs.pop("chroma_boost", 1)
 
         errors = np.array(self.error_iterations)
 
@@ -2900,14 +2911,15 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
 
             for n, ax in enumerate(grid):
                 if plot_fourier_probe:
-                    probe_array = Complex2RGB(
-                        asnumpy(
-                            self._return_fourier_probe_from_centered_probe(
-                                probes[grid_range[n]][0]
-                            )
-                        ),
-                        chroma_boost=chroma_boost,
+                    probe_array = asnumpy(
+                        self._return_fourier_probe_from_centered_probe(
+                            probes[grid_range[n]][0],
+                            remove_initial_probe_aberrations=remove_initial_probe_aberrations,
+                        )
                     )
+
+                    probe_array = Complex2RGB(probe_array, chroma_boost=chroma_boost)
+
                     ax.set_title(f"Iter: {grid_range[n]} Fourier probe[0]")
                     ax.set_ylabel("kx [mrad]")
                     ax.set_xlabel("ky [mrad]")
@@ -2953,6 +2965,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         plot_convergence: bool = True,
         plot_probe: bool = True,
         plot_fourier_probe: bool = False,
+        remove_initial_probe_aberrations: bool = False,
         cbar: bool = True,
         padding: int = 0,
         **kwargs,
@@ -2974,6 +2987,9 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
             If true, the reconstructed probe intensity is also displayed
         plot_fourier_probe: bool, optional
             If true, the reconstructed complex Fourier probe is displayed
+        remove_initial_probe_aberrations: bool, optional
+            If true, when plotting fourier probe, removes initial probe
+            to visualize changes
         padding : int, optional
             Pixels to pad by post rotating-cropping object
 
@@ -2989,6 +3005,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
                 plot_convergence=plot_convergence,
                 plot_probe=plot_probe,
                 plot_fourier_probe=plot_fourier_probe,
+                remove_initial_probe_aberrations=remove_initial_probe_aberrations,
                 cbar=cbar,
                 padding=padding,
                 **kwargs,
@@ -3000,6 +3017,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
                 iterations_grid=iterations_grid,
                 plot_probe=plot_probe,
                 plot_fourier_probe=plot_fourier_probe,
+                remove_initial_probe_aberrations=remove_initial_probe_aberrations,
                 cbar=cbar,
                 padding=padding,
                 **kwargs,
@@ -3007,7 +3025,14 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         return self
 
     def show_fourier_probe(
-        self, probe=None, scalebar=True, pixelsize=None, pixelunits=None, **kwargs
+        self,
+        probe=None,
+        remove_initial_probe_aberrations=False,
+        cbar=True,
+        scalebar=True,
+        pixelsize=None,
+        pixelunits=None,
+        **kwargs,
     ):
         """
         Plot probe in fourier space
@@ -3016,6 +3041,8 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         ----------
         probe: complex array, optional
             if None is specified, uses the `probe_fourier` property
+        remove_initial_probe_aberrations: bool, optional
+            If True, removes initial probe aberrations from Fourier probe
         scalebar: bool, optional
             if True, adds scalebar to probe
         pixelunits: str, optional
@@ -3026,21 +3053,37 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
         asnumpy = self._asnumpy
 
         if probe is None:
-            probe = list(self.probe_fourier)
+            probe = list(
+                asnumpy(
+                    self._return_fourier_probe(
+                        probe,
+                        remove_initial_probe_aberrations=remove_initial_probe_aberrations,
+                    )
+                )
+            )
         else:
             if isinstance(probe, np.ndarray) and probe.ndim == 2:
                 probe = [probe]
-            probe = [asnumpy(self._return_fourier_probe(pr)) for pr in probe]
+            probe = [
+                asnumpy(
+                    self._return_fourier_probe(
+                        pr,
+                        remove_initial_probe_aberrations=remove_initial_probe_aberrations,
+                    )
+                )
+                for pr in probe
+            ]
 
         if pixelsize is None:
             pixelsize = self._reciprocal_sampling[1]
         if pixelunits is None:
             pixelunits = r"$\AA^{-1}$"
 
-        chroma_boost = kwargs.pop("chroma_boost", 2)
+        chroma_boost = kwargs.pop("chroma_boost", 1)
 
         show_complex(
             probe if len(probe) > 1 else probe[0],
+            cbar=cbar,
             scalebar=scalebar,
             pixelsize=pixelsize,
             pixelunits=pixelunits,
@@ -3052,6 +3095,7 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
     def show_transmitted_probe(
         self,
         plot_fourier_probe: bool = False,
+        remove_initial_probe_aberrations=False,
         **kwargs,
     ):
         """
@@ -3094,7 +3138,12 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
 
         if plot_fourier_probe:
             bottom_row = [
-                asnumpy(self._return_fourier_probe(probe))
+                asnumpy(
+                    self._return_fourier_probe(
+                        probe,
+                        remove_initial_probe_aberrations=remove_initial_probe_aberrations,
+                    )
+                )
                 for probe in [
                     mean_transmitted,
                     min_intensity_transmitted,
@@ -3313,7 +3362,9 @@ class MixedstateMultislicePtychographicReconstruction(PtychographicReconstructio
             gaussian_filter_sigma /= self.sampling[0]
             rotated_object = gaussian_filter(rotated_object, gaussian_filter_sigma)
 
-        plot_im = rotated_object[:, 0, int(y1_0) : int(y2_0)]
+        plot_im = rotated_object[
+            :, 0, np.max((0, int(y1_0))) : np.min((int(y2_0), rotated_object.shape[2]))
+        ]
 
         extent = [
             0,

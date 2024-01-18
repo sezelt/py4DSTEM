@@ -276,7 +276,7 @@ class Crystal:
 
         parser = CifParser(CIF)
 
-        structure = parser.get_structures()[0]
+        structure = parser.get_structures(False)[0]
 
         return Crystal.from_pymatgen_structure(
             structure, conventional_standard_structure=conventional_standard_structure
@@ -870,12 +870,12 @@ class Crystal:
         )
         intensity_unique = np.bincount(inv, weights=intensity)
 
-        if plot_rings == True:
+        if plot_rings is True:
             from py4DSTEM.process.diffraction.crystal_viz import plot_ring_pattern
 
             plot_ring_pattern(radii_unique, intensity_unique, **plot_params)
 
-        if return_calc == True:
+        if return_calc is True:
             return radii_unique, intensity_unique
 
     # Vector conversions and other utilities for Crystal classes

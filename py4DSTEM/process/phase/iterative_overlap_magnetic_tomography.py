@@ -8,7 +8,6 @@ from typing import Mapping, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pylops
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from py4DSTEM.visualize import show
@@ -17,8 +16,13 @@ from scipy.ndimage import rotate as rotate_np
 
 try:
     import cupy as cp
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     cp = np
+    import os
+
+    # make sure pylops doesn't try to use cupy
+    os.environ["CUPY_PYLOPS"] = "0"
+import pylops  # this must follow the exception
 
 from emdfile import Custom, tqdmnd
 from py4DSTEM import DataCube
@@ -165,13 +169,6 @@ class OverlapMagneticTomographicReconstruction(PtychographicReconstruction):
 
         if object_type != "potential":
             raise NotImplementedError()
-
-        if positions_mask is not None and positions_mask.dtype != "bool":
-            warnings.warn(
-                ("`positions_mask` converted to `bool` array"),
-                UserWarning,
-            )
-            positions_mask = np.asarray(positions_mask, dtype="bool")
 
         self.set_save_defaults()
 
@@ -512,15 +509,43 @@ class OverlapMagneticTomographicReconstruction(PtychographicReconstruction):
                 )
             )
 
+        if self._positions_mask is not None:
+            self._positions_mask = np.asarray(self._positions_mask)
+
+            if self._positions_mask.ndim == 2:
+                warnings.warn(
+                    "2D `positions_mask` assumed the same for all measurements.",
+                    UserWarning,
+                )
+                self._positions_mask = np.tile(
+                    self._positions_mask, (self._num_tilts, 1, 1)
+                )
+
+            if self._positions_mask.dtype != "bool":
+                warnings.warn(
+                    ("`positions_mask` converted to `bool` array."),
+                    UserWarning,
+                )
+                self._positions_mask = self._positions_mask.astype("bool")
+        else:
+            self._positions_mask = [None] * self._num_tilts
+
         # Prepopulate various arrays
-        num_probes_per_tilt = [0]
 
-        for dc in self._datacube:
-            rx, ry = dc.Rshape
-            num_probes_per_tilt.append(rx * ry)
+        if self._positions_mask[0] is None:
+            num_probes_per_tilt = [0]
+            for dc in self._datacube:
+                rx, ry = dc.Rshape
+                num_probes_per_tilt.append(rx * ry)
 
-        self._num_diffraction_patterns = sum(num_probes_per_tilt)
-        self._cum_probes_per_tilt = np.cumsum(np.array(num_probes_per_tilt))
+            num_probes_per_tilt = np.array(num_probes_per_tilt)
+        else:
+            num_probes_per_tilt = np.insert(
+                self._positions_mask.sum(axis=(-2, -1)), 0, 0
+            )
+
+        self._num_diffraction_patterns = num_probes_per_tilt.sum()
+        self._cum_probes_per_tilt = np.cumsum(num_probes_per_tilt)
 
         self._mean_diffraction_intensity = []
         self._positions_px_all = np.empty((self._num_diffraction_patterns, 2))
