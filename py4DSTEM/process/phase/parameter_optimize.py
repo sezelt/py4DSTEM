@@ -186,7 +186,7 @@ class PtychographyOptimizer:
                 pbar.update(1)
                 error_metric(ptycho)
 
-        self._grid_search_function = self._get_optimization_function(
+        grid_search_function = self._get_optimization_function(
             self._reconstruction_type,
             self._parameter_list,
             self._init_static_args,
@@ -200,7 +200,7 @@ class PtychographyOptimizer:
             evaluation_callback,
         )
 
-        grid_search_res = list(map(self._grid_search_function, params_grid))
+        grid_search_res = list(map(grid_search_function, params_grid))
         pbar.close()
 
         if plot_reconstructed_objects:
@@ -290,7 +290,7 @@ class PtychographyOptimizer:
 
         error_metric = self._get_error_metric(error_metric)
 
-        self._optimization_function = self._get_optimization_function(
+        optimization_function = self._get_optimization_function(
             self._reconstruction_type,
             self._parameter_list,
             self._init_static_args,
@@ -314,7 +314,7 @@ class PtychographyOptimizer:
 
         try:
             self._skopt_result = gp_minimize(
-                self._optimization_function,
+                optimization_function,
                 self._parameter_list,
                 n_calls=n_calls,
                 n_initial_points=n_initial_points,
@@ -326,11 +326,8 @@ class PtychographyOptimizer:
             print("Optimized parameters:")
             for p, x in zip(self._parameter_list, self._skopt_result.x):
                 print(f"{p.name}: {x}")
-
-            # Finish the tqdm progressbar so subsequent things behave nicely
-            pbar.close()
-        except KeyboardInterrupt:
-            # close the pbar gracefully on interrupt
+        finally:
+            # close the pbar and clear memory gracefully on interrupt
             pbar.close()
 
         return self
