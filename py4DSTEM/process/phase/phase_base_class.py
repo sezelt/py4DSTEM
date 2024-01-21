@@ -1383,7 +1383,7 @@ class PhaseReconstruction(Custom):
                     if not positions_mask[rx, ry]:
                         continue
                 intensities = get_shifted_ar(
-                    diffraction_intensities[rx, ry],
+                    diffraction_intensities[rx, ry] * (self._dp_mask if self._dp_mask is not None else 1.0),
                     -com_fitted_x[rx, ry],
                     -com_fitted_y[rx, ry],
                     bilinear=True,
