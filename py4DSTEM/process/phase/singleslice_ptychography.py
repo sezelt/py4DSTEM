@@ -37,6 +37,7 @@ from py4DSTEM.process.phase.utils import (
     generate_batches,
     polar_aliases,
     polar_symbols,
+    cartesian_symbols,
 )
 
 warnings.simplefilter(action="always", category=UserWarning)
@@ -142,6 +143,21 @@ class SingleslicePtychography(
 
         self.set_device(device, clear_fft_cache)
         self.set_storage(storage)
+
+        for key in cartesian_symbols:
+            if key in kwargs.keys():
+                aberration_name = key[:3]
+                aberration_x = kwargs.pop(aberration_name + "_x", 0.0)
+                aberration_y = kwargs.pop(aberration_name + "_y", 0.0)                
+                
+                aberration_magntiude = np.sqrt(
+                    (aberration_x) ** 2 + (aberration_y) ** 2
+                )
+                aberration_angle = np.arctan2(aberration_y, aberration_x) / int(
+                    aberration_name[2]
+                )
+                kwargs[aberration_name] = aberration_magntiude
+                kwargs["phi" + aberration_name[1:]] = aberration_angle
 
         for key in kwargs.keys():
             if (key not in polar_symbols) and (key not in polar_aliases.keys()):
