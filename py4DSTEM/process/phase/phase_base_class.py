@@ -711,6 +711,9 @@ class PhaseReconstruction(Custom):
         com_fitted_x = xp.asarray(com_shifts[0], dtype=xp.float32)
         com_fitted_y = xp.asarray(com_shifts[1], dtype=xp.float32)
 
+        com_measured_x = xp.asarray(com_measured_x, dtype=xp.float32)
+        com_measured_y = xp.asarray(com_measured_y, dtype=xp.float32)
+
         # fix CoM units
         com_normalized_x = (
             xp.nan_to_num(com_measured_x - com_fitted_x) * reciprocal_sampling[0]

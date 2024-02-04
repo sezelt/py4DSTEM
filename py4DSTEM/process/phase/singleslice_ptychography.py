@@ -214,6 +214,7 @@ class SingleslicePtychography(
         force_com_rotation: float = None,
         force_com_transpose: float = None,
         force_com_shifts: float = None,
+        force_com_measured: list = None,
         vectorized_com_calculation: bool = True,
         force_scan_sampling: float = None,
         force_angular_sampling: float = None,
@@ -365,6 +366,7 @@ class SingleslicePtychography(
             dp_mask=self._dp_mask,
             fit_function=fit_function,
             com_shifts=force_com_shifts,
+            com_measured=force_com_measured,
             vectorized_calculation=vectorized_com_calculation,
         )
 
