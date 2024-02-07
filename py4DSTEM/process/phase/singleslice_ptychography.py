@@ -758,6 +758,7 @@ class SingleslicePtychography(
         # handle device/storage
         self.set_device(device, clear_fft_cache)
 
+
         if device is not None:
             attrs = [
                 "_known_aberrations_array",
@@ -774,6 +775,7 @@ class SingleslicePtychography(
         device = self._device
         asnumpy = self._asnumpy
 
+        self._dp_mask = copy_to_device(self._dp_mask, device)
         # set and report reconstruction method
         (
             use_projection_scheme,

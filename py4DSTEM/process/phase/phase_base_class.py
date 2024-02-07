@@ -1398,9 +1398,14 @@ class PhaseReconstruction(Custom):
                         region_of_interest_shape
                     )
 
+
                 mean_intensity += np.sum(intensities)
                 amplitudes[counter] = np.sqrt(np.maximum(intensities, 0))
                 counter += 1
+        if crop_patterns:
+            self._dp_mask = np.fft.fftshift(self._dp_mask[crop_mask].reshape(region_of_interest_shape))
+        else:
+            self._dp_mask = np.fft.fftshift(self._dp_mask)
 
         mean_intensity /= amplitudes.shape[0]
 
