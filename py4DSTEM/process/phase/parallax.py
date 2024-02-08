@@ -36,8 +36,6 @@ try:
 except (ModuleNotFoundError, ImportError):
     cp = np
 
-warnings.simplefilter(action="always", category=UserWarning)
-
 _aberration_names = {
     (1, 0): "C1        ",
     (1, 2): "stig      ",
@@ -79,7 +77,7 @@ class Parallax(PhaseReconstruction):
         self,
         energy: float,
         datacube: DataCube = None,
-        verbose: bool = False,
+        verbose: bool = True,
         object_padding_px: Tuple[int, int] = (32, 32),
         device: str = "cpu",
         storage: str = None,
@@ -737,7 +735,7 @@ class Parallax(PhaseReconstruction):
         self,
         max_alignment_bin: int = None,
         min_alignment_bin: int = 1,
-        max_iter_at_min_bin: int = 2,
+        num_iter_at_min_bin: int = 2,
         alignment_bin_values: list = None,
         cross_correlation_upsample_factor: int = 8,
         regularizer_matrix_size: Tuple[int, int] = (1, 1),
@@ -761,7 +759,7 @@ class Parallax(PhaseReconstruction):
             If None, the bright field disk radius is used
         min_alignment_bin: int, optional
             Minimum bin size for bright field alignment
-        max_iter_at_min_bin: int, optional
+        num_iter_at_min_bin: int, optional
             Number of iterations to run at the smallest bin size
         alignment_bin_values: list, optional
             If not None, explicitly sets the iteration bin values
@@ -870,9 +868,9 @@ class Parallax(PhaseReconstruction):
             bin_max = np.ceil(np.log(max_alignment_bin) / np.log(2))
             bin_vals = 2 ** np.arange(bin_min, bin_max)[::-1]
 
-            if max_iter_at_min_bin > 1:
+            if num_iter_at_min_bin > 1:
                 bin_vals = np.hstack(
-                    (bin_vals, np.repeat(bin_vals[-1], max_iter_at_min_bin - 1))
+                    (bin_vals, np.repeat(bin_vals[-1], num_iter_at_min_bin - 1))
                 )
 
         if plot_aligned_bf:

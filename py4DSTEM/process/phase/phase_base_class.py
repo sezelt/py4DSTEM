@@ -2,6 +2,7 @@
 Module for reconstructing phase objects from 4DSTEM datasets using iterative methods.
 """
 
+import sys
 import warnings
 
 import matplotlib.pyplot as plt
@@ -32,7 +33,8 @@ from py4DSTEM.process.utils import (
     get_shifted_ar,
 )
 
-warnings.simplefilter(action="always", category=UserWarning)
+warnings.showwarning = lambda msg, *args, **kwargs: print(msg, file=sys.stderr)
+warnings.simplefilter("always", UserWarning)
 
 
 class PhaseReconstruction(Custom):
@@ -146,7 +148,13 @@ class PhaseReconstruction(Custom):
         self._datacube = datacube
         return self
 
-    def reinitialize_parameters(self, device: str = None, verbose: bool = None):
+    def reinitialize_parameters(
+        self,
+        device: str = None,
+        storage: str = None,
+        clear_fft_cache: bool = None,
+        verbose: bool = None,
+    ):
         """
         Reinitializes common parameters. This is useful when loading a previously-saved
         reconstruction (which set device='cpu' and verbose=True for compatibility) ,
@@ -155,7 +163,11 @@ class PhaseReconstruction(Custom):
         Parameters
         ----------
         device: str, optional
-            If not None, imports and assigns appropriate device modules
+            If not None, assigns appropriate device modules
+        storage: str, optional
+            If not None, assigns appropriate storage modules
+        clear_fft_cache: bool, optional
+            If not None, sets the FFT caching parameter
         verbose: bool, optional
             If not None, sets the verbosity to verbose
 
@@ -166,23 +178,10 @@ class PhaseReconstruction(Custom):
         """
 
         if device is not None:
-            if device == "cpu":
-                import scipy
+            self.set_device(device, clear_fft_cache)
 
-                self._xp = np
-                self._asnumpy = np.asarray
-                self._scipy = scipy
-
-            elif device == "gpu":
-                from cupyx import scipy
-
-                self._xp = cp
-                self._asnumpy = cp.asnumpy
-                self._scipy = scipy
-
-            else:
-                raise ValueError(f"device must be either 'cpu' or 'gpu', not {device}")
-            self._device = device
+        if storage is not None:
+            self.set_storage(storage)
 
         if verbose is not None:
             self._verbose = verbose
@@ -881,9 +880,10 @@ class PhaseReconstruction(Custom):
 
                 if verbose:
                     if _rotation_best_transpose:
-                        print("Diffraction intensities should be transposed.")
-                    else:
-                        print("No need to transpose diffraction intensities.")
+                        warnings.warn(
+                            "Diffraction intensities should be transposed.",
+                            UserWarning,
+                        )
 
         else:
             # Rotation unknown
@@ -988,7 +988,10 @@ class PhaseReconstruction(Custom):
                         _rotation_best_rad = rotation_angles_rad[ind_min]
 
                 if verbose:
-                    print(("Best fit rotation = " f"{rotation_best_deg:.0f} degrees."))
+                    warnings.warn(
+                        f"Best fit rotation = {rotation_best_deg:.0f} degrees.",
+                        UserWarning,
+                    )
 
                 if plot_rotation:
                     figsize = kwargs.get("figsize", (8, 2))
@@ -1142,11 +1145,15 @@ class PhaseReconstruction(Custom):
 
                 # Print summary
                 if verbose:
-                    print(("Best fit rotation = " f"{rotation_best_deg:.0f} degrees."))
+                    warnings.warn(
+                        f"Best fit rotation = {rotation_best_deg:.0f} degrees.",
+                        UserWarning,
+                    )
                     if _rotation_best_transpose:
-                        print("Diffraction intensities should be transposed.")
-                    else:
-                        print("No need to transpose diffraction intensities.")
+                        warnings.warn(
+                            "Diffraction intensities should be transposed.",
+                            UserWarning,
+                        )
 
                 # Plot Curl/Div rotation
                 if plot_rotation:
@@ -1506,6 +1513,8 @@ class PtychographicReconstruction(PhaseReconstruction):
             "object_type": self._object_type,
             "verbose": self._verbose,
             "device": self._device,
+            "storage": self._storage,
+            "clear_fft_cache": self._clear_fft_cache,
             "name": self.name,
             "vacuum_probe_intensity": vacuum_probe_intensity,
             "positions": scan_positions,
@@ -1654,6 +1663,8 @@ class PtychographicReconstruction(PhaseReconstruction):
             "polar_parameters": polar_params,
             "verbose": True,  # for compatibility
             "device": "cpu",  # for compatibility
+            "storage": "cpu",  # for compatibility
+            "clear_fft_cache": True,  # for compatibility
         }
 
         class_specific_kwargs = {}
@@ -1694,19 +1705,41 @@ class PtychographicReconstruction(PhaseReconstruction):
             self._exit_waves = None
 
         # Check if stack
-        if hasattr(error, "__len__"):
+        if "_object_iterations_emd" in dict_data.keys():
             self.object_iterations = list(dict_data["_object_iterations_emd"].data)
             self.probe_iterations = list(dict_data["_probe_iterations_emd"].data)
-            self.error_iterations = error
-            self.error = error[-1]
-        else:
-            self.error = error
+
+        self.error_iterations = error
+        self.error = error[-1]
 
         # Slim preprocessing to enable visualize
         self._positions_px_com = xp.mean(self._positions_px, axis=0)
         self.object = asnumpy(self._object)
         self.probe = self.probe_centered
         self._preprocessed = True
+
+    def _switch_object_type(self, object_type):
+        """
+        Switches object type to/from "potential"/"complex"
+
+        Returns
+        --------
+        self: PhaseReconstruction
+            Self to enable chaining
+        """
+        xp = self._xp
+
+        match (self._object_type, object_type):
+            case ("potential", "complex"):
+                self._object_type = "complex"
+                self._object = xp.exp(1j * self._object, dtype=xp.complex64)
+            case ("complex", "potential"):
+                self._object_type = "potential"
+                self._object = xp.angle(self._object)
+            case _:
+                self._object_type = self._object_type
+
+        return self
 
     def _set_polar_parameters(self, parameters: dict):
         """
@@ -2030,7 +2063,6 @@ class PtychographicReconstruction(PhaseReconstruction):
     def _report_reconstruction_summary(
         self,
         max_iter,
-        switch_object_iter,
         use_projection_scheme,
         reconstruction_method,
         reconstruction_parameter,
@@ -2044,16 +2076,7 @@ class PtychographicReconstruction(PhaseReconstruction):
         """ """
 
         # object type
-        if switch_object_iter > max_iter:
-            first_line = f"Performing {max_iter} iterations using a {self._object_type} object type, "
-        else:
-            switch_object_type = (
-                "complex" if self._object_type == "potential" else "potential"
-            )
-            first_line = (
-                f"Performing {switch_object_iter} iterations using a {self._object_type} object type and "
-                f"{max_iter - switch_object_iter} iterations using a {switch_object_type} object type, "
-            )
+        first_line = f"Performing {max_iter} iterations using a {self._object_type} object type, "
 
         # stochastic gradient descent
         if max_batch_size is not None:
@@ -2065,41 +2088,45 @@ class PtychographicReconstruction(PhaseReconstruction):
                     )
                 )
             else:
-                print(
+                warnings.warn(
                     (
                         first_line + f"with the {reconstruction_method} algorithm, "
                         f"with normalization_min: {normalization_min} and step _size: {step_size}, "
                         f"in batches of max {max_batch_size} measurements."
-                    )
+                    ),
+                    UserWarning,
                 )
 
         else:
             # named projection set method
             if reconstruction_parameter is not None:
-                print(
+                warnings.warn(
                     (
                         first_line + f"with the {reconstruction_method} algorithm, "
                         f"with normalization_min: {normalization_min} and α: {reconstruction_parameter}."
-                    )
+                    ),
+                    UserWarning,
                 )
 
             # generalized projections (or the even more rare charge-flipping)
             elif projection_a is not None:
-                print(
+                warnings.warn(
                     (
                         first_line + f"with the {reconstruction_method} algorithm, "
                         f"with normalization_min: {normalization_min} and (a,b,c): "
                         f"{projection_a, projection_b, projection_c}."
-                    )
+                    ),
+                    UserWarning,
                 )
 
             # gradient descent
             else:
-                print(
+                warnings.warn(
                     (
                         first_line + f"with the {reconstruction_method} algorithm, "
                         f"with normalization_min: {normalization_min} and step _size: {step_size}."
-                    )
+                    ),
+                    UserWarning,
                 )
 
     def _constraints(

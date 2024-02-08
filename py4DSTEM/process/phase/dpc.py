@@ -22,8 +22,6 @@ from py4DSTEM.datacube import DataCube
 from py4DSTEM.process.phase.phase_base_class import PhaseReconstruction
 from py4DSTEM.visualize.vis_special import return_scaled_histogram_ordering
 
-warnings.simplefilter(action="always", category=UserWarning)
-
 
 class DPC(PhaseReconstruction):
     """
@@ -647,8 +645,8 @@ class DPC(PhaseReconstruction):
         backtrack: bool = True,
         progress_bar: bool = True,
         gaussian_filter_sigma: float = None,
-        gaussian_filter_iter: int = np.inf,
-        butterworth_filter_iter: int = np.inf,
+        gaussian_filter: bool = True,
+        butterworth_filter: bool = True,
         q_lowpass: float = None,
         q_highpass: float = None,
         butterworth_order: float = 2,
@@ -677,10 +675,10 @@ class DPC(PhaseReconstruction):
             If True, reconstruction progress bar will be printed
         gaussian_filter_sigma: float, optional
             Standard deviation of gaussian kernel in A
-        gaussian_filter_iter: int, optional
-            Number of iterations to run using object smoothness constraint
-        butterworth_filter_iter: int, optional
-            Number of iterations to run using high-pass butteworth filter
+        gaussian_filter: bool, optional
+            If True and gaussian_filter_sigma is not None, object is smoothed using gaussian filtering
+        butterworth_filter: bool, optional
+            If True and q_lowpass or q_highpass is not None, object is smoothed using butterworth filtering
         q_lowpass: float
             Cut-off frequency in A^-1 for low-pass butterworth filter
         q_highpass: float
@@ -773,8 +771,6 @@ class DPC(PhaseReconstruction):
             if (new_error > self.error) and backtrack:
                 self._padded_object_phase = previous_iteration
                 self._step_size /= 2
-                if self._verbose:
-                    print(f"Iteration {a0}, step reduced to {self._step_size}")
                 continue
             self.error = new_error
 
@@ -789,10 +785,9 @@ class DPC(PhaseReconstruction):
             # constraints
             self._padded_object_phase = self._constraints(
                 self._padded_object_phase,
-                gaussian_filter=a0 < gaussian_filter_iter
-                and gaussian_filter_sigma is not None,
+                gaussian_filter=gaussian_filter and gaussian_filter_sigma is not None,
                 gaussian_filter_sigma=gaussian_filter_sigma,
-                butterworth_filter=a0 < butterworth_filter_iter
+                butterworth_filter=butterworth_filter
                 and (q_lowpass is not None or q_highpass is not None),
                 q_lowpass=q_lowpass,
                 q_highpass=q_highpass,
