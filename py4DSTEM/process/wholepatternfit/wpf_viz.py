@@ -8,7 +8,7 @@ from matplotlib.gridspec import GridSpec
 from py4DSTEM.process.wholepatternfit.wp_models import WPFModelType
 
 
-def show_model_grid(self, x=None, **plot_kwargs):
+def show_model_grid(self, x=None, returnfig=False, **plot_kwargs):
     x = self.mean_CBED_fit.x if x is None else x
 
     model = [m for m in self.model if WPFModelType.DUMMY not in m.model_type]
@@ -52,6 +52,8 @@ def show_model_grid(self, x=None, **plot_kwargs):
     for a in ax.flat:
         a.axis("off")
 
+    if returnfig:
+        return fig, ax
     plt.show()
 
 
@@ -61,9 +63,11 @@ def show_lattice_points(
     vmin=None,
     vmax=None,
     power=None,
+    spot_size=100,
     show_vectors=True,
     crop_to_pattern=False,
     returnfig=False,
+    show_moire=True,
     moire_origin_idx=[0, 0, 0, 0],
     *args,
     **kwargs,
@@ -132,7 +136,7 @@ def show_lattice_points(
         axpts = ax.scatter(
             spots[:, 1],
             spots[:, 0],
-            s=100,
+            s=spot_size,
             marker="x",
             label=m.name,
         )
@@ -158,48 +162,49 @@ def show_lattice_points(
                 width=1.0,
             )
 
-    moires = [m for m in self.model if WPFModelType.MOIRE in m.model_type]
+    if show_moire:
+        moires = [m for m in self.model if WPFModelType.MOIRE in m.model_type]
 
-    for m in moires:
-        lat_ab = m._get_parent_lattices(m.lattice_a, m.lattice_b)
-        lat_abm = np.vstack((lat_ab, m.moire_matrix @ lat_ab))
+        for m in moires:
+            lat_ab = m._get_parent_lattices(m.lattice_a, m.lattice_b)
+            lat_abm = np.vstack((lat_ab, m.moire_matrix @ lat_ab))
 
-        spots = m.moire_indices_uvm @ lat_abm
-        spots[:, 0] += m.params["x center"].initial_value
-        spots[:, 1] += m.params["y center"].initial_value
+            spots = m.moire_indices_uvm @ lat_abm
+            spots[:, 0] += m.params["x center"].initial_value
+            spots[:, 1] += m.params["y center"].initial_value
 
-        axpts = ax.scatter(
-            spots[:, 1],
-            spots[:, 0],
-            s=100,
-            marker="+",
-            label=m.name,
-        )
-
-        if show_vectors:
-            arrow_origin = np.array(moire_origin_idx) @ lat_ab
-            arrow_origin[0] += m.params["x center"].initial_value
-            arrow_origin[1] += m.params["y center"].initial_value
-
-            ax.arrow(
-                arrow_origin[1],
-                arrow_origin[0],
-                lat_abm[4, 1],
-                lat_abm[4, 0],
-                length_includes_head=True,
-                color=axpts.get_facecolor(),
-                width=1.0,
+            axpts = ax.scatter(
+                spots[:, 1],
+                spots[:, 0],
+                s=spot_size,
+                marker="+",
+                label=m.name,
             )
 
-            ax.arrow(
-                arrow_origin[1],
-                arrow_origin[0],
-                lat_abm[5, 1],
-                lat_abm[5, 0],
-                length_includes_head=True,
-                color=axpts.get_facecolor(),
-                width=1.0,
-            )
+            if show_vectors:
+                arrow_origin = np.array(moire_origin_idx) @ lat_ab
+                arrow_origin[0] += m.params["x center"].initial_value
+                arrow_origin[1] += m.params["y center"].initial_value
+
+                ax.arrow(
+                    arrow_origin[1],
+                    arrow_origin[0],
+                    lat_abm[4, 1],
+                    lat_abm[4, 0],
+                    length_includes_head=True,
+                    color=axpts.get_facecolor(),
+                    width=1.0,
+                )
+
+                ax.arrow(
+                    arrow_origin[1],
+                    arrow_origin[0],
+                    lat_abm[5, 1],
+                    lat_abm[5, 0],
+                    length_includes_head=True,
+                    color=axpts.get_facecolor(),
+                    width=1.0,
+                )
 
     ax.legend()
 
