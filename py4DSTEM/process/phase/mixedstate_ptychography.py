@@ -221,6 +221,7 @@ class MixedstatePtychography(
         device: str = None,
         clear_fft_cache: bool = None,
         max_batch_size: int = None,
+        vectorized_com_calculation: bool = False,
         **kwargs,
     ):
         """
@@ -367,6 +368,7 @@ class MixedstatePtychography(
             dp_mask=self._dp_mask,
             fit_function=fit_function,
             com_shifts=force_com_shifts,
+            vectorized_calculation=vectorized_com_calculation,
         )
 
         # estimate rotation / transpose
@@ -636,6 +638,7 @@ class MixedstatePtychography(
         device: str = None,
         clear_fft_cache: bool = None,
         object_type: str = None,
+        recon_mask=None,
     ):
         """
         Ptychographic reconstruction main method.
@@ -774,6 +777,9 @@ class MixedstatePtychography(
         xp_storage = self._xp_storage
         device = self._device
         asnumpy = self._asnumpy
+
+        if recon_mask is not None:
+            self._dp_mask = copy_to_device(np.fft.fftshift(recon_mask), device)
 
         # set and report reconstruction method
         (
@@ -941,9 +947,12 @@ class MixedstatePtychography(
                 tv_denoise_inner_iter=tv_denoise_inner_iter,
                 object_positivity=object_positivity,
                 shrinkage_rad=shrinkage_rad,
-                object_mask=self._object_fov_mask_inverse
-                if fix_potential_baseline and self._object_fov_mask_inverse.sum() > 0
-                else None,
+                object_mask=(
+                    self._object_fov_mask_inverse
+                    if fix_potential_baseline
+                    and self._object_fov_mask_inverse.sum() > 0
+                    else None
+                ),
                 pure_phase_object=pure_phase_object and self._object_type == "complex",
             )
 

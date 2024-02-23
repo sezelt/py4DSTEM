@@ -145,8 +145,8 @@ class SingleslicePtychography(
             if key in kwargs.keys():
                 aberration_name = key[:3]
                 aberration_x = kwargs.pop(aberration_name + "_x", 0.0)
-                aberration_y = kwargs.pop(aberration_name + "_y", 0.0)                
-                
+                aberration_y = kwargs.pop(aberration_name + "_y", 0.0)
+
                 aberration_magntiude = np.sqrt(
                     (aberration_x) ** 2 + (aberration_y) ** 2
                 )
@@ -316,9 +316,8 @@ class SingleslicePtychography(
         if self._positions_mask is not None:
             self._positions_mask = np.asarray(self._positions_mask, dtype="bool")
 
-
         if "force_com_x" in kwargs.keys() or "force_com_y" in kwargs.keys():
-            force_com_shifts = [kwargs.pop("force_com_x"), kwargs.pop('force_com_y')]
+            force_com_shifts = [kwargs.pop("force_com_x"), kwargs.pop("force_com_y")]
         # preprocess datacube
         (
             self._datacube,
@@ -633,6 +632,7 @@ class SingleslicePtychography(
         device: str = None,
         clear_fft_cache: bool = None,
         object_type: str = None,
+        recon_mask=None,
     ):
         """
         Ptychographic reconstruction main method.
@@ -754,7 +754,6 @@ class SingleslicePtychography(
         # handle device/storage
         self.set_device(device, clear_fft_cache)
 
-
         if device is not None:
             attrs = [
                 "_known_aberrations_array",
@@ -773,7 +772,8 @@ class SingleslicePtychography(
         device = self._device
         asnumpy = self._asnumpy
 
-        self._dp_mask = copy_to_device(self._dp_mask, device)
+        if recon_mask is not None:
+            self._dp_mask = copy_to_device(np.fft.fftshift(recon_mask), device)
         # set and report reconstruction method
         (
             use_projection_scheme,
@@ -939,9 +939,12 @@ class SingleslicePtychography(
                 tv_denoise_inner_iter=tv_denoise_inner_iter,
                 object_positivity=object_positivity,
                 shrinkage_rad=shrinkage_rad,
-                object_mask=self._object_fov_mask_inverse
-                if fix_potential_baseline and self._object_fov_mask_inverse.sum() > 0
-                else None,
+                object_mask=(
+                    self._object_fov_mask_inverse
+                    if fix_potential_baseline
+                    and self._object_fov_mask_inverse.sum() > 0
+                    else None
+                ),
                 pure_phase_object=pure_phase_object and self._object_type == "complex",
             )
 

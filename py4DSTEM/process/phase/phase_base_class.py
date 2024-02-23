@@ -1000,17 +1000,21 @@ class PhaseReconstruction(Custom):
                     if _rotation_best_transpose:
                         ax.plot(
                             rotation_angles_deg,
-                            asnumpy(rotation_div_transpose)
-                            if maximize_divergence
-                            else asnumpy(rotation_curl_transpose),
+                            (
+                                asnumpy(rotation_div_transpose)
+                                if maximize_divergence
+                                else asnumpy(rotation_curl_transpose)
+                            ),
                             label="CoM after transpose",
                         )
                     else:
                         ax.plot(
                             rotation_angles_deg,
-                            asnumpy(rotation_div)
-                            if maximize_divergence
-                            else asnumpy(rotation_curl),
+                            (
+                                asnumpy(rotation_div)
+                                if maximize_divergence
+                                else asnumpy(rotation_curl)
+                            ),
                             label="CoM",
                         )
 
@@ -1162,16 +1166,20 @@ class PhaseReconstruction(Custom):
 
                     ax.plot(
                         rotation_angles_deg,
-                        asnumpy(rotation_div)
-                        if maximize_divergence
-                        else asnumpy(rotation_curl),
+                        (
+                            asnumpy(rotation_div)
+                            if maximize_divergence
+                            else asnumpy(rotation_curl)
+                        ),
                         label="CoM",
                     )
                     ax.plot(
                         rotation_angles_deg,
-                        asnumpy(rotation_div_transpose)
-                        if maximize_divergence
-                        else asnumpy(rotation_curl_transpose),
+                        (
+                            asnumpy(rotation_div_transpose)
+                            if maximize_divergence
+                            else asnumpy(rotation_curl_transpose)
+                        ),
                         label="CoM after transpose",
                     )
                     y_r = ax.get_ylim()
@@ -1393,7 +1401,8 @@ class PhaseReconstruction(Custom):
                     if not positions_mask[rx, ry]:
                         continue
                 intensities = get_shifted_ar(
-                    diffraction_intensities[rx, ry] * (self._dp_mask if self._dp_mask is not None else 1.0),
+                    diffraction_intensities[rx, ry]
+                    * (self._dp_mask if self._dp_mask is not None else 1.0),
                     -com_fitted_x[rx, ry],
                     -com_fitted_y[rx, ry],
                     bilinear=True,
@@ -1405,12 +1414,13 @@ class PhaseReconstruction(Custom):
                         region_of_interest_shape
                     )
 
-
                 mean_intensity += np.sum(intensities)
                 amplitudes[counter] = np.sqrt(np.maximum(intensities, 0))
                 counter += 1
         if crop_patterns:
-            self._dp_mask = np.fft.fftshift(self._dp_mask[crop_mask].reshape(region_of_interest_shape))
+            self._dp_mask = np.fft.fftshift(
+                self._dp_mask[crop_mask].reshape(region_of_interest_shape)
+            )
         else:
             self._dp_mask = np.fft.fftshift(self._dp_mask)
 
