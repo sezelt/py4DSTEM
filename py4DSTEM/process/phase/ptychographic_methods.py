@@ -1507,7 +1507,7 @@ class ObjectNDProbeMethodsMixin:
 
         fourier_overlap = xp.fft.fft2(overlap)
         farfield_amplitudes = self._return_farfield_amplitudes(fourier_overlap)
-        error = xp.sum(xp.abs(amplitudes - farfield_amplitudes * self._dp_mask) ** 2)
+        error = xp.sum(xp.abs(amplitudes - farfield_amplitudes)**2 * self._dp_mask)
 
         fourier_modified_overlap = fourier_overlap * (
             1 - self._dp_mask

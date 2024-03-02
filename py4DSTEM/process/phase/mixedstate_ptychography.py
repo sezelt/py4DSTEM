@@ -213,6 +213,7 @@ class MixedstatePtychography(
         force_com_rotation: float = None,
         force_com_transpose: float = None,
         force_com_shifts: float = None,
+        force_com_measured: float = None,
         force_scan_sampling: float = None,
         force_angular_sampling: float = None,
         force_reciprocal_sampling: float = None,
@@ -368,6 +369,7 @@ class MixedstatePtychography(
             dp_mask=self._dp_mask,
             fit_function=fit_function,
             com_shifts=force_com_shifts,
+            com_measured=force_com_measured,
             vectorized_calculation=vectorized_com_calculation,
         )
 
@@ -639,6 +641,7 @@ class MixedstatePtychography(
         clear_fft_cache: bool = None,
         object_type: str = None,
         recon_mask=None,
+        keep_exit_waves=False,
     ):
         """
         Ptychographic reconstruction main method.
@@ -968,7 +971,7 @@ class MixedstatePtychography(
         self.error = error.item()
 
         # remove _exit_waves attr from self for GD
-        if not use_projection_scheme:
+        if not keep_exit_waves:
             self._exit_waves = None
 
         self.clear_device_mem(self._device, self._clear_fft_cache)
