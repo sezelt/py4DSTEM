@@ -22,6 +22,7 @@ from py4DSTEM.process.phase.utils import (
     lanczos_interpolate_array,
     lanczos_kernel_density_estimate,
     pixel_rolling_kernel_density_estimate,
+    fft_shift,
 )
 from py4DSTEM.process.utils.cross_correlate import align_images_fourier
 from py4DSTEM.process.utils.utils import electron_wavelength_angstrom
@@ -646,8 +647,6 @@ class Parallax(PhaseReconstruction):
         # Initialization utilities
         self._stack_mask = xp.tile(self._window_pad[None], (self._num_bf_images, 1, 1))
         if defocus_guess is not None:
-            Gs = xp.fft.fft2(self._stack_BF_shifted)
-
             self._xy_shifts = (
                 -self._probe_angles
                 * defocus_guess
@@ -662,19 +661,26 @@ class Parallax(PhaseReconstruction):
                 )
                 self._xy_shifts = xp.dot(self._xy_shifts, rotation_matrix)
 
-            dx = self._xy_shifts[:, 0]
-            dy = self._xy_shifts[:, 1]
+            # apply shifts
+            for idx in tqdmnd(
+                self._stack_BF_shifted.shape[0],
+                desc="Performing initial shifts",
+                unit=" images",
+                # disable=not progress_bar,
+            ):
+                shift_op = xp.exp(
+                    self._qx_shift * self._xy_shifts[idx, 0]
+                    + self._qy_shift * self._xy_shifts[idx, 1],
+                )
 
-            shift_op = xp.exp(
-                self._qx_shift[None] * dx[:, None, None]
-                + self._qy_shift[None] * dy[:, None, None]
-            )
-            self._stack_BF_shifted = xp.real(xp.fft.ifft2(Gs * shift_op))
-            self._stack_mask = xp.real(
-                xp.fft.ifft2(xp.fft.fft2(self._stack_mask) * shift_op)
-            )
+                self._stack_BF_shifted[idx] = xp.real(
+                    xp.fft.ifft2(xp.fft.fft2(self._stack_BF_shifted[idx]) * shift_op)
+                )
 
-            del Gs
+                self._stack_mask[idx] = xp.real(
+                    xp.fft.ifft2(xp.fft.fft2(self._stack_mask[idx]) * shift_op)
+                )
+
         else:
             self._xy_shifts = xp.zeros((self._num_bf_images, 2), dtype=xp.float32)
 
@@ -978,22 +984,26 @@ class Parallax(PhaseReconstruction):
             shifts_update = xy_shifts_fit - self._xy_shifts
 
             # apply shifts
-            Gs = xp.fft.fft2(self._stack_BF_shifted)
+            for idx in tqdmnd(
+                self._stack_BF_shifted.shape[0],
+                desc="Shift at bin " + str(bin_vals[a0].astype("int")),
+                unit=" image subsets",
+                disable=not progress_bar,
+            ):
+                shift_op = xp.exp(
+                    self._qx_shift * shifts_update[idx, 0]
+                    + self._qy_shift * shifts_update[idx, 1],
+                )
 
-            dx = shifts_update[:, 0]
-            dy = shifts_update[:, 1]
-            self._xy_shifts[:, 0] += dx
-            self._xy_shifts[:, 1] += dy
+                self._stack_BF_shifted[idx] = xp.real(
+                    xp.fft.ifft2(xp.fft.fft2(self._stack_BF_shifted[idx]) * shift_op)
+                )
 
-            shift_op = xp.exp(
-                self._qx_shift[None] * dx[:, None, None]
-                + self._qy_shift[None] * dy[:, None, None]
-            )
+                self._stack_mask[idx] = xp.real(
+                    xp.fft.ifft2(xp.fft.fft2(self._stack_mask[idx]) * shift_op)
+                )
 
-            self._stack_BF_shifted = xp.real(xp.fft.ifft2(Gs * shift_op))
-            self._stack_mask = xp.real(
-                xp.fft.ifft2(xp.fft.fft2(self._stack_mask) * shift_op)
-            )
+                self._xy_shifts[idx] += shifts_update[idx,]
 
             self._stack_BF_shifted = xp.asarray(
                 self._stack_BF_shifted, dtype=xp.float32
@@ -1001,8 +1011,6 @@ class Parallax(PhaseReconstruction):
             self._stack_mask = xp.asarray(
                 self._stack_mask, dtype=xp.float32
             )  # numpy fft upcasts?
-
-            del Gs
 
             # Center the shifts
             xy_shifts_median = xp.round(xp.median(self._xy_shifts, axis=0)).astype(int)
@@ -2666,7 +2674,7 @@ class Parallax(PhaseReconstruction):
                 self._qx_shift[None] * dx[:, None, None]
                 + self._qy_shift[None] * dy[:, None, None]
             )
-            im_depth = xp.fft.fft2(self._stack_BF_shifted) * shift_op * CTF_corr
+            im_depth = xp.fft.fft2(self._stack_BF_shifted) * shift_op  # * CTF_corr
 
             if k_info_limit is not None:
                 im_depth /= 1 + (kra2**k_info_power) / (
