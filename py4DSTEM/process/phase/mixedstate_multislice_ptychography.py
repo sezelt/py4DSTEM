@@ -42,6 +42,7 @@ from py4DSTEM.process.phase.utils import (
     generate_batches,
     polar_aliases,
     polar_symbols,
+    cartesian_symbols,
 )
 
 
@@ -196,8 +197,16 @@ class MixedstateMultislicePtychography(
             num_probes = initial_probe_guess.shape[0]
 
         for key in kwargs.keys():
-            if (key not in polar_symbols) and (key not in polar_aliases.keys()):
+            if key not in (polar_symbols + cartesian_symbols + tuple(polar_aliases.keys())):
                 raise ValueError("{} not a recognized parameter".format(key))
+
+        for c in cartesian_symbols:
+            if c in kwargs.keys():
+                symbol = c[:3] # get the aberration C_mn
+                cx = kwargs.pop(symbol + "_x", 0.0)
+                cy = kwargs.pop(symbol + "_y", 0.0)
+                kwargs[symbol] = np.hypot(cx, cy)
+                kwargs["phi" + symbol[1:]] = np.arctan2(cy, cx)
 
         slice_thicknesses = np.array(slice_thicknesses)
         if slice_thicknesses.shape == ():

@@ -35,6 +35,14 @@ polar_symbols = (
         "C50", "C52", "phi52", "C54", "phi54", "C56", "phi56",
 )
 
+cartesian_symbols = (
+        "C12_x", "C12_y",
+        "C21_x", "C21_y", "C23_x", "C23_y",
+        "C32_x", "C32_y", "C34_x", "C34_y",
+        "C41_x", "C41_y", "C43_x", "C43_y", "C45_x", "C45_y",
+        "C52_x", "C52_y", "C54_x", "C54_y", "C56_x", "C56_y",
+)
+
 #: Aliases for the most commonly used optical aberrations.
 polar_aliases = {
         "defocus": "C10", "astigmatism": "C12", "astigmatism_angle": "phi12",
