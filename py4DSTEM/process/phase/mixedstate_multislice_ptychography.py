@@ -3,7 +3,7 @@ Module for reconstructing phase objects from 4DSTEM datasets using iterative met
 namely multislice ptychography.
 """
 
-from typing import Mapping, Sequence, Tuple, Union
+from typing import Mapping, Sequence, Tuple, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -289,8 +289,9 @@ class MixedstateMultislicePtychography(
         crop_patterns: bool = False,
         store_initial_arrays: bool = True,
         device: str = None,
-        clear_fft_cache: bool = None,
+        clear_fft_cache: Optional[bool] = None,
         max_batch_size: int = None,
+        delta_defocus:float = 0,
         **kwargs,
     ):
         """
@@ -555,6 +556,7 @@ class MixedstateMultislicePtychography(
             self._mean_diffraction_intensity,
             self._semiangle_cutoff,
             crop_patterns,
+            delta_defocus,
         )
 
         # initialize aberrations
@@ -715,11 +717,11 @@ class MixedstateMultislicePtychography(
         num_iter: int = 8,
         reconstruction_method: str = "gradient-descent",
         reconstruction_parameter: float = 1.0,
-        reconstruction_parameter_a: float = None,
-        reconstruction_parameter_b: float = None,
-        reconstruction_parameter_c: float = None,
-        max_batch_size: int = None,
-        seed_random: int = None,
+        reconstruction_parameter_a: Optional[float] = None,
+        reconstruction_parameter_b: Optional[float] = None,
+        reconstruction_parameter_c: Optional[float] = None,
+        max_batch_size: Optional[int] = None,
+        seed_random: Optional[int] = None,
         step_size: float = 0.5,
         normalization_min: float = 1,
         positions_step_size: float = 0.9,
@@ -727,6 +729,7 @@ class MixedstateMultislicePtychography(
         orthogonalize_probe: bool = True,
         fix_probe: bool = False,
         fix_probe_aperture: bool = False,
+        num_modes_aperture_constraint:int=1,
         constrain_probe_amplitude: bool = False,
         constrain_probe_amplitude_relative_radius: float = 0.5,
         constrain_probe_amplitude_relative_width: float = 0.05,
@@ -735,28 +738,28 @@ class MixedstateMultislicePtychography(
         constrain_probe_fourier_amplitude_constant_intensity: bool = False,
         fix_positions: bool = True,
         fix_positions_com: bool = True,
-        max_position_update_distance: float = None,
-        max_position_total_distance: float = None,
+        max_position_update_distance: Optional[float] = None,
+        max_position_total_distance: Optional[float] = None,
         global_affine_transformation: bool = False,
-        gaussian_filter_sigma: float = None,
+        gaussian_filter_sigma: Optional[float] = None,
         gaussian_filter: bool = True,
         fit_probe_aberrations: bool = False,
         fit_probe_aberrations_max_angular_order: int = 4,
         fit_probe_aberrations_max_radial_order: int = 4,
         fit_probe_aberrations_remove_initial: bool = False,
         fit_probe_aberrations_using_scikit_image: bool = True,
-        num_probes_fit_aberrations: int = np.inf,
+        num_probes_fit_aberrations: Optional[int] = np.inf,
         butterworth_filter: bool = True,
-        q_lowpass: float = None,
-        q_highpass: float = None,
+        q_lowpass: Optional[float] = None,
+        q_highpass: Optional[float] = None,
         butterworth_order: float = 2,
         kz_regularization_filter: bool = True,
-        kz_regularization_gamma: Union[float, np.ndarray] = None,
+        kz_regularization_gamma: Optional[Union[float, np.ndarray]] = None,
         identical_slices: bool = False,
         object_positivity: bool = True,
         shrinkage_rad: float = 0.0,
         fix_potential_baseline: bool = True,
-        detector_fourier_mask: np.ndarray = None,
+        detector_fourier_mask: Optional[np.ndarray] = None,
         pure_phase_object: bool = False,
         tv_denoise_chambolle: bool = True,
         tv_denoise_weight_chambolle=None,
@@ -766,10 +769,10 @@ class MixedstateMultislicePtychography(
         tv_denoise_inner_iter=40,
         store_iterations: bool = False,
         progress_bar: bool = True,
-        reset: bool = None,
-        device: str = None,
-        clear_fft_cache: bool = None,
-        object_type: str = None,
+        reset: Optional[bool] = None,
+        device: Optional[str] = None,
+        clear_fft_cache: Optional[bool] = None,
+        object_type: Optional[str] = None,
     ):
         """
         Ptychographic reconstruction main method.
@@ -956,6 +959,8 @@ class MixedstateMultislicePtychography(
                 max_batch_size,
                 step_size,
             )
+
+        self._num_modes_aperture_constraint = num_modes_aperture_constraint
 
         # batching
         shuffled_indices = np.arange(self._num_diffraction_patterns)

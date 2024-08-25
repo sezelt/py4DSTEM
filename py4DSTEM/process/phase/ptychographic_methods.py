@@ -985,6 +985,7 @@ class ProbeMethodsMixin:
         mean_diffraction_intensity,
         semiangle_cutoff,
         crop_patterns,
+        parameters=None
     ):
         """ """
         # explicit read-only self attributes up-front
@@ -996,7 +997,7 @@ class ProbeMethodsMixin:
         sampling = self.sampling
         energy = self._energy
         rolloff = self._rolloff
-        polar_parameters = self._polar_parameters
+        polar_parameters = parameters or self._polar_parameters
 
         if initial_probe is None:
             if vacuum_probe_intensity is not None:
@@ -1389,6 +1390,7 @@ class ProbeMixedMethodsMixin:
         mean_diffraction_intensity,
         semiangle_cutoff,
         crop_patterns,
+        delta_defocus=0.,
     ):
         """ """
 
@@ -1422,9 +1424,16 @@ class ProbeMixedMethodsMixin:
                 shift_y = xp.exp(
                     -2j * np.pi * (xp.random.rand() - 0.5) * xp.fft.fftfreq(sy)
                 )
-                _probes[i_probe] = (
-                    _probes[i_probe - 1] * shift_x[:, None] * shift_y[None]
+                _probe, semiangle_cutoff = ProbeMethodsMixin._initialize_probe(
+                    self,
+                    initial_probe,
+                    vacuum_probe_intensity,
+                    mean_diffraction_intensity,
+                    semiangle_cutoff,
+                    crop_patterns,
+                    parameters=self._polar_parameters | {"C10":self._polar_parameters["C10"] + i_probe*delta_defocus}
                 )
+                _probes[i_probe] = _probe * shift_x[:, None] * shift_y[None]
         else:
             _probes = xp.asarray(initial_probe, dtype=xp.complex64)
 

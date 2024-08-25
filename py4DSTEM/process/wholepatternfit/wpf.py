@@ -582,11 +582,12 @@ class WholePatternFit:
     def _pattern_error(self, x, current_pattern, shared_data):
         DP = self._pattern(x, shared_data)
 
+        if self._track:
+            self._fevals.append(DP.copy())
+            self._xevals.append(x.copy())
+
         DP = (DP - current_pattern) * self.mask
 
-        if self._track:
-            self._fevals.append(DP)
-            self._xevals.append(x)
         self._cost_history.append(np.sum(DP**2))
 
         return DP.ravel()

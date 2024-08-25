@@ -636,6 +636,7 @@ class MixedstatePtychography(
         orthogonalize_probe: bool = True,
         fix_probe: bool = False,
         fix_probe_aperture: bool = False,
+        num_modes_aperture_constraint:int = 1,
         constrain_probe_amplitude: bool = False,
         constrain_probe_amplitude_relative_radius: float = 0.5,
         constrain_probe_amplitude_relative_width: float = 0.05,
@@ -819,6 +820,8 @@ class MixedstatePtychography(
         xp_storage = self._xp_storage
         device = self._device
         asnumpy = self._asnumpy
+
+        self._num_modes_aperture_constraint = num_modes_aperture_constraint
 
         # set and report reconstruction method
         (

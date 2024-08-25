@@ -1,4 +1,5 @@
 from typing import Optional
+from matplotlib import legend
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -65,6 +66,7 @@ def show_lattice_points(
     crop_to_pattern=False,
     returnfig=False,
     moire_origin_idx=[0, 0, 0, 0],
+    legend_loc="best",
     *args,
     **kwargs,
 ):
@@ -129,6 +131,16 @@ def show_lattice_points(
         spots[:, 0] += m.params["x center"].initial_value
         spots[:, 1] += m.params["y center"].initial_value
 
+        keep = np.logical_and.reduce(
+            (
+                spots[:,0] < im.shape[0] - 1, 
+                spots[:,0] > 0,
+                spots[:,1] < im.shape[1] - 1,
+                spots[:,1] > 0,
+            )
+        )
+        spots = spots[keep]
+
         axpts = ax.scatter(
             spots[:, 1],
             spots[:, 0],
@@ -168,6 +180,16 @@ def show_lattice_points(
         spots[:, 0] += m.params["x center"].initial_value
         spots[:, 1] += m.params["y center"].initial_value
 
+        keep = np.logical_and.reduce(
+            (
+                spots[:,0] < im.shape[0] - 1 , 
+                spots[:,0] > 0,
+                spots[:,1] < im.shape[1] - 1,
+                spots[:,1] > 0,
+            )
+        )
+        spots = spots[keep]
+
         axpts = ax.scatter(
             spots[:, 1],
             spots[:, 0],
@@ -201,7 +223,7 @@ def show_lattice_points(
                 width=1.0,
             )
 
-    ax.legend()
+    ax.legend(loc=legend_loc)
 
     if crop_to_pattern:
         ax.set_xlim(0, im.shape[1] - 1)

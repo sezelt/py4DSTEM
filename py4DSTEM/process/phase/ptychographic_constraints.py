@@ -605,7 +605,7 @@ class Object2p5DConstraintsMixin:
 
         # zero pad at top and bottom slice
         pad_width = ((z_padding, z_padding), (0, 0), (0, 0))
-        current_object = xp.pad(current_object, pad_width=pad_width, mode="constant")
+        # current_object = xp.pad(current_object, pad_width=pad_width, mode="constant")
 
         qz = xp.fft.fftfreq(current_object.shape[0], self._slice_thicknesses[0])
         qx = xp.fft.fftfreq(current_object.shape[1], self.sampling[0])
@@ -620,7 +620,7 @@ class Object2p5DConstraintsMixin:
         w = 1 - 2 / np.pi * xp.arctan2(qz2, qr2)
 
         current_object = xp.fft.ifftn(xp.fft.fftn(current_object) * w)
-        current_object = current_object[z_padding:-z_padding]
+        # current_object = current_object[z_padding:-z_padding]
 
         if self._object_type == "potential":
             current_object = xp.real(current_object)
@@ -690,7 +690,7 @@ class Object2p5DConstraintsMixin:
             current_object = self._object_kz_regularization_constraint(
                 current_object,
                 kz_regularization_gamma,
-                z_padding=1,
+                z_padding=0,
             )
         elif tv_denoise:
             current_object = self._object_denoise_tv_pylops(
@@ -1257,10 +1257,11 @@ class ProbeMixedConstraintsMixin:
 
         # Fourier amplitude (aperture) constraints
         if fix_probe_aperture:
-            current_probe[0] = self._probe_aperture_constraint(
-                current_probe[0],
-                initial_probe_aperture[0],
-            )
+            for i in range(self._num_modes_aperture_constraint):
+                current_probe[i] = self._probe_aperture_constraint(
+                    current_probe[i],
+                    initial_probe_aperture[i],
+                )
         elif constrain_probe_fourier_amplitude:
             current_probe[0] = self._probe_fourier_amplitude_constraint(
                 current_probe[0],
